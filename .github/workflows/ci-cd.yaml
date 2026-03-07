@@ -6,18 +6,33 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      model_trials:
+        description: Number of Optuna trials to run
+        required: false
+        default: "5"
+      publish_image:
+        description: Push Docker image to GHCR
+        required: false
+        type: boolean
+        default: false
+      trigger_deploy:
+        description: Call the deployment webhook after publishing
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  packages: write
 
 env:
   PYTHON_VERSION: "3.11"
-  MODEL_TRIALS: "5"
+  DEFAULT_MODEL_TRIALS: "5"
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/customer-churn
 
 jobs:
-  data-validation:
+  data_validation:
+    name: Validate Data
     runs-on: ubuntu-latest
 
     steps:
@@ -43,9 +58,10 @@ jobs:
           name: data-validation-report
           path: reports/data_validation.json
 
-  quality-checks:
+  quality_checks:
+    name: Test And Lint
     runs-on: ubuntu-latest
-    needs: data-validation
+    needs: data_validation
 
     steps:
       - uses: actions/checkout@v4
@@ -67,9 +83,10 @@ jobs:
       - name: Test
         run: python -m pytest -q tests
 
-  train-model:
+  train_model:
+    name: Train Model
     runs-on: ubuntu-latest
-    needs: [data-validation, quality-checks]
+    needs: [data_validation, quality_checks]
 
     steps:
       - uses: actions/checkout@v4
@@ -91,7 +108,9 @@ jobs:
           python src/data/split_data.py --config params.yaml
 
       - name: Train optimized model
-        run: python src/models/train_model.py --config params.yaml --n-trials ${{ env.MODEL_TRIALS }}
+        run: |
+          python src/models/train_model.py --config params.yaml --n-trials \
+          ${{ github.event.inputs.model_trials || env.DEFAULT_MODEL_TRIALS }}
 
       - name: Upload model artifacts
         uses: actions/upload-artifact@v4
@@ -102,9 +121,10 @@ jobs:
             reports/model_metrics.json
             reports/best_params.json
 
-  drift-monitoring:
+  drift_monitoring:
+    name: Monitor Drift
     runs-on: ubuntu-latest
-    needs: train-model
+    needs: train_model
 
     steps:
       - uses: actions/checkout@v4
@@ -142,9 +162,10 @@ jobs:
             reports/drift_report.html
             reports/drift_report.json
 
-  build-image:
+  build_image:
+    name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: [quality-checks, train-model, drift-monitoring]
+    needs: [quality_checks, train_model, drift_monitoring]
 
     steps:
       - uses: actions/checkout@v4
@@ -160,10 +181,19 @@ jobs:
           push: false
           tags: customer-churn:ci
 
-  deploy:
+  publish_image:
+    name: Publish Image
     runs-on: ubuntu-latest
-    needs: build-image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build_image
+    permissions:
+      contents: read
+      packages: write
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.publish_image == 'true') ||
+      (github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      vars.AUTO_PUBLISH_IMAGE == 'true')
 
     steps:
       - uses: actions/checkout@v4
@@ -188,11 +218,25 @@ jobs:
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:latest
 
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: publish_image
+    if: >
+      needs.publish_image.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.trigger_deploy == 'true'
+    env:
+      DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+
+    steps:
       - name: Trigger runtime deployment
-        if: ${{ secrets.DEPLOY_WEBHOOK_URL != '' }}
-        env:
-          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        if: env.DEPLOY_WEBHOOK_URL != ''
         run: |
           curl -X POST "$DEPLOY_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{\"image\":\"${{ env.IMAGE_NAME }}:${{ github.sha }}\"}"
+
+      - name: Skip deployment when webhook is not configured
+        if: env.DEPLOY_WEBHOOK_URL == ''
+        run: echo "DEPLOY_WEBHOOK_URL is not configured; skipping deploy."

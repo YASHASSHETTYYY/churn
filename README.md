@@ -152,7 +152,17 @@ python -m pytest -q tests --basetemp .pytest_run -p no:cacheprovider
 - `train-model`
 - `drift-monitoring`
 - `build-image`
+- `publish-image`
 - `deploy`
 
-The `deploy` job publishes the container image to GHCR on pushes to `main` and
-can optionally trigger a runtime deployment through `DEPLOY_WEBHOOK_URL`.
+By default, push and pull request runs stop at validation, tests, training,
+drift monitoring, and image build.
+
+Manual `workflow_dispatch` runs can additionally:
+
+- set `model_trials`
+- enable `publish_image` to push to GHCR
+- enable `trigger_deploy` to call `DEPLOY_WEBHOOK_URL`
+
+Automatic image publishing on `main` is disabled unless you set the repository
+variable `AUTO_PUBLISH_IMAGE=true`.
