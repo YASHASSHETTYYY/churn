@@ -16,8 +16,8 @@ dashboard.
   errors
 - Dockerfile and `docker-compose.yml` for API, dashboard, Prometheus, and
   Grafana
-- GitHub Actions workflow for linting, tests, model build, drift report
-  generation, and Docker image build
+- GitHub Actions workflow split into data validation, quality checks,
+  training, drift monitoring, image build, and deployment jobs
 
 ## Stack
 
@@ -145,12 +145,14 @@ python -m pytest -q tests --basetemp .pytest_run -p no:cacheprovider
 
 ## CI
 
-`.github/workflows/ci-cd.yaml` now runs:
+`.github/workflows/ci-cd.yaml` now shows the pipeline as separate stages:
 
-- dependency installation
-- data preparation
-- optimized model training
-- drift report generation
-- flake8
-- pytest
-- Docker image build
+- `data-validation`
+- `quality-checks`
+- `train-model`
+- `drift-monitoring`
+- `build-image`
+- `deploy`
+
+The `deploy` job publishes the container image to GHCR on pushes to `main` and
+can optionally trigger a runtime deployment through `DEPLOY_WEBHOOK_URL`.
