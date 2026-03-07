@@ -1,41 +1,23 @@
-"""Module providing a function for model monitoring using evidently."""
+"""Backward-compatible wrapper around the Evidently drift report job."""
+
+from __future__ import annotations
 
 import argparse
-import yaml
-import pandas as pd
+import sys
+from pathlib import Path
 
-from evidently.dashboard import Dashboard
-from evidently.dashboard.tabs import DataDriftTab,CatTargetDriftTab
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-def read_params(config_path):
-    """
-    read parameters from the params.yaml file
-    input: params.yaml location
-    output: parameters as dictionary
-    """
-    with open(config_path) as yaml_file:
-        config = yaml.safe_load(yaml_file)
-    return config
+from src.monitoring.drift_report import generate_drift_report
 
-def model_monitoring(config_path):
-    config = read_params(config_path)
-    train_data_path = config["raw_data_config"]["raw_data_csv"]
-    new_train_data_path=config["raw_data_config"]["new_train_data_csv"]
-    target = config["raw_data_config"]["target"]
-    monitor_dashboard_path = config["model_monitor"]["monitor_dashboard_html"]
-    monitor_target = config["model_monitor"]["target_col_name"]
 
-    ref=pd.read_csv(train_data_path)
-    cur=pd.read_csv(new_train_data_path)
+def model_monitoring(config_path="params.yaml"):
+    return generate_drift_report(config_path=config_path)
 
-    ref=ref.rename(columns ={target:monitor_target}, inplace = False)
-    cur=cur.rename(columns ={target:monitor_target}, inplace = False)
-    
-    data_and_target_drift_dashboard = Dashboard(tabs=[DataDriftTab(), CatTargetDriftTab()])
-    data_and_target_drift_dashboard.calculate(ref,cur, column_mapping = None)
-    data_and_target_drift_dashboard.save(monitor_dashboard_path)
 
-if __name__=="__main__":
+if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument("--config", default="params.yaml")
     parsed_args = args.parse_args()

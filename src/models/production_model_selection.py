@@ -1,55 +1,30 @@
-"""Module providing a function for logging the production model."""
+"""Backward-compatible helper to sync the trained artifact to deployment paths."""
 
-import joblib
-import mlflow
+from __future__ import annotations
+
 import argparse
-from pprint import pprint
-from train_model import read_params
-from mlflow.tracking import MlflowClient
-              
-import dagshub
-dagshub.init(repo_owner='rohmats',
-             repo_name='mlops-project-customer-churn',
-             mlflow=True)
+import shutil
+import sys
+from pathlib import Path
 
-def log_production_model(config_path):
-    config = read_params(config_path)
-    mlflow_config = config["mlflow_config"] 
-    model_name = mlflow_config["registered_model_name"]
-    model_dir = config["model_dir"]
-    remote_server_uri = mlflow_config["remote_server_uri"]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-    mlflow.set_tracking_uri(remote_server_uri)
-    runs = mlflow.search_runs(experiment_ids="0")
-    max_accuracy = max(runs["metrics.accuracy"])
-    max_accuracy_run_id = list(runs[runs["metrics.accuracy"] == max_accuracy]["run_id"])[0]
-    
-    client = MlflowClient()
-    for mv in client.search_model_versions(f"name='{model_name}'"):
-        mv = dict(mv)
+from src.config import load_config, resolve_path
 
-        if mv["run_id"] == max_accuracy_run_id:
-            current_version = mv["version"]
-            logged_model = mv["source"]
-            pprint(mv, indent=4)
-            client.transition_model_version_stage(
-                name=model_name,
-                version=current_version,
-                stage="Production"
-            )
-        else:
-            current_version = mv["version"]
-            client.transition_model_version_stage(
-                name=model_name,
-                version=current_version,
-                stage="Staging"
-            )        
 
-    loaded_model = mlflow.pyfunc.load_model(logged_model)
-    joblib.dump(loaded_model, model_dir)
+def log_production_model(config_path="params.yaml") -> str:
+    config = load_config(config_path)
+    source = resolve_path(config["training"]["artifact_path"], config_path)
+    destination = resolve_path(config["model_dir"], config_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return str(destination)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument("--config", default="params.yaml")
     parsed_args = args.parse_args()
-    data = log_production_model(config_path=parsed_args.config)
+    log_production_model(config_path=parsed_args.config)

@@ -1,0 +1,54 @@
+{
+  "backend": "fallback",
+  "report_path": "D:\\mlops_project\\mlops-project-customer-churn\\reports\\drift_report.html",
+  "error": "cannot import name 'ColumnDriftMetric' from 'evidently.metrics' (D:\\mlops_project\\mlops-project-customer-churn\\.venv\\Lib\\site-packages\\evidently\\metrics\\__init__.py)",
+  "columns": [
+    {
+      "column": "number_vmail_messages",
+      "reference_mean": 7.636764705882353,
+      "current_mean": 7.6117647058823525,
+      "mean_delta": -0.025000000000000355
+    },
+    {
+      "column": "total_day_calls",
+      "reference_mean": 100.05529411764707,
+      "current_mean": 99.31529411764706,
+      "mean_delta": -0.7400000000000091
+    },
+    {
+      "column": "total_eve_minutes",
+      "reference_mean": 200.12408823529412,
+      "current_mean": 200.37317647058825,
+      "mean_delta": 0.24908823529412416
+    },
+    {
+      "column": "total_eve_charge",
+      "reference_mean": 17.01075882352941,
+      "current_mean": 17.032023529411763,
+      "mean_delta": 0.021264705882352075
+    },
+    {
+      "column": "total_intl_minutes",
+      "reference_mean": 10.220823529411764,
+      "current_mean": 10.397058823529411,
+      "mean_delta": 0.1762352941176477
+    },
+    {
+      "column": "number_customer_service_calls",
+      "reference_mean": 1.5594117647058823,
+      "current_mean": 1.5576470588235294,
+      "mean_delta": -0.0017647058823528905
+    },
+    {
+      "column": "prediction",
+      "reference_mean": 0.2735024357405917,
+      "current_mean": 0.27888606066061805,
+      "mean_delta": 0.005383624920026364
+    },
+    {
+      "column": "churn",
+      "reference_mode": "no",
+      "current_mode": "no"
+    }
+  ]
+}

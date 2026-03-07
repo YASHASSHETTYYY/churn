@@ -1,13 +1,28 @@
 # local package
 -e .
 
-# external requirements
+# quality and testing
 flake8
-cookiecutter
-dvc 
+pytest
+httpx
+
+# data and modeling
 numpy
-pandas 
-scikit-learn 
-mlflow
+pandas
+scikit-learn
 joblib
-flask 
+pyyaml
+optuna
+shap
+evidently
+
+# serving and dashboards
+fastapi
+uvicorn[standard]
+prometheus-client
+streamlit
+
+# existing project dependencies
+cookiecutter
+dvc
+mlflow

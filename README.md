@@ -1,120 +1,156 @@
-# End to End MLOps Project - Customer Churn Prediction
-## Objective
-Predict whether a customer will change telco provider using this kaggle [dataset](https://www.kaggle.com/c/customer-churn-prediction-2020/data?select=train.csv).
+# Customer Churn MLOps Project
 
-## Technologies
-- [Cookiecutter](https://github.com/drivendataorg/cookiecutter-data-science): Data science project structure
-- [Data version control (DVC)](https://github.com/iterative/dvc): Version control of the data assets and to make pipeline
-- [Github](https://github.com/): For code version control
-- [GitHub Actions](https://github.com/): To create the CI-CD pipeline
-- [MLFlow](https://mlflow.org/): For model registry
-- [Dagshub](https://dagshub.com/): MLFlow and DVC integration
-- [Heroku](https://heroku.com/): To deploy the application
-- [Flask](https://flask.palletsprojects.com/en/3.0.x/): To create a web app
-- [EvidentlyAI](https://www.evidentlyai.com/): To evaluate and monitor ML models in production
-- [Pytest](https://pypi.org/project/pytest/): To implement the unit tests
-- [Flake8](https://pypi.org/project/flake8/): Code linting
+Production-oriented customer churn prediction project with optimized training,
+FastAPI serving, monitoring, Docker deployment, CI, and an interactive
+dashboard.
 
-## Environment Setup
-### Cookiecutter
-```shell
-pip install cookiecutter-data-science
-cookiecutter https://github.com/drivendata/cookiecutter-data-science -c v1
-```
-- project_name: mlops-project-customer-churn
-- repo_name: mlops-project-customer-churn
-- author_name: rohmats
-- description: End to End MLOps Project - Customer Churn Prediction
-- Select open_source_license: select MIT(option 1)
-- s3_bucket /aws_profile[Optional]: just press enter
-- Select python_interpreter:python3 ( Option 1)
+## What Changed
 
-### Conda Environment
-```shell
-conda create -n customer_churn python=3.9 -y 
-conda activate customer_churn
-```
+- FastAPI serving layer with `/predict`, `/predict/batch`, `/explain`,
+  `/health`, and `/metrics`
+- Optuna-based hyperparameter optimization for the Random Forest model
+- Shared prediction service used by the API, monitoring job, and Streamlit app
+- SHAP-based local explanations for churn predictions
+- Drift monitoring job that generates `reports/drift_report.html`
+- Prometheus metrics plus a Grafana dashboard for request volume, latency, and
+  errors
+- Dockerfile and `docker-compose.yml` for API, dashboard, Prometheus, and
+  Grafana
+- GitHub Actions workflow for linting, tests, model build, drift report
+  generation, and Docker image build
 
-### Python Dependencies
-```shell
-python -m pip install -r requirements.txt
-```
+## Stack
 
-If Windows installs packages into the user site, console scripts such as `dvc`,
-`pytest`, and `flake8` are created under
-`%APPDATA%\Python\Python313\Scripts`. Add that directory to your `PATH` if you
-want to call those commands directly from PowerShell. If you do not want to
-change `PATH`, run them as Python modules instead, for example
-`python -m dvc repro`.
+- FastAPI
+- Uvicorn
+- Streamlit
+- Optuna
+- SHAP
+- Evidently
+- Prometheus
+- Grafana
+- scikit-learn
+- DVC
+- pytest
+- flake8
 
-### DVC
-> Version control of the data assets and to make pipeline
-```shell
-python -m pip install dvc 
-dvc init 
-dvc add data/external/train.csv
-python -m dvc repro
-```
-## MLflow Dagshub
-```shell
-pip install dagshub mlflow
-```
-[MLflow UI]([https://](https://dagshub.com/rohmats/mlops-project-customer-churn.mlflow))
+## Recommended Python Version
 
-## Unit testing
-```shell
-pytest -v 
+Use Python 3.11 for local development and deployment. The included Docker and
+GitHub Actions setup already targets Python 3.11.
+
+## Project Layout
+
+```text
+src/
+├── api/app.py                 # FastAPI serving layer
+├── config.py                  # Shared config/path helpers
+├── data/                      # Data ingestion and splitting
+├── models/predict.py          # Shared predictor + SHAP explanations
+├── models/train_model.py      # Optuna training pipeline
+└── monitoring/drift_report.py # Drift report generation
+
+dashboard/streamlit_app.py     # Interactive prediction dashboard
+monitoring/prometheus.yml      # Prometheus scrape config
+monitoring/grafana/            # Grafana provisioning + dashboard
+docker-compose.yml             # API + dashboard + monitoring stack
 ```
 
-## CI/CD Pipeline
-To create a CI/CD pipeline for your project, you can use GitHub Actions. Here are the steps to set it up:
+## Training
 
-1. Create a `.github/workflows` directory in your repository.
-2. Inside the `workflows` directory, create a YAML file (e.g., `ci-cd.yml`) to define your CI/CD workflow.
-3. In the YAML file, define the workflow using the `on` keyword to specify the events that trigger the workflow (e.g., push to the `main` branch).
-4. Use the `jobs` keyword to define the steps of your workflow. For example, you can have a job to build and test your code, and another job to deploy the application.
-5. Configure the necessary environment variables and secrets for your workflow, such as API keys or deployment credentials.
-6. Commit and push the YAML file to your repository.
+```bash
+python src/data/load_data.py --config params.yaml
+python src/data/split_data.py --config params.yaml
+python src/models/train_model.py --config params.yaml --n-trials 50
+```
 
-With GitHub Actions, you can automate the build, test, and deployment processes of your project, ensuring that your application is always up-to-date and running smoothly.
+Artifacts are written to:
 
-## Linting
-This project uses `flake8` for code linting
+- `models/churn_model.joblib`
+- `reports/model_metrics.json`
+- `reports/best_params.json`
 
-## [Final App Deployed on Heroku](https://mlops-sur-a44e15b513c2.herokuapp.com/)
+## API
 
-## Data Pipeline
-![alt text](image.png)
+Run the serving layer:
 
-## Project Organization
-------------
-    ├── artifacts               <- MLflow artifacts
-    │   └── 1
-    │       └── 465969c77a7341d1b58ee4b044cbbcf8
-    │           └── artifacts
-    │               └── model
-    ├── data                    <- Data directory
-    │   ├── external            <- Data from third party sources
-    │   ├── processed           <- The final, canonical data sets for modeling
-    │   └── raw                 <- The original, immutable data dump
-    ├── docs
-    ├── models                  <- Trained and serialized models, model predictions, or model summaries
-    ├── notebooks               <- Jupyter notebooks
-    ├── references              <- Data dictionaries, manuals, and all other explanatory materials
-    ├── reports                 <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures
-    ├── src                     <- Source code for use in this project
-    │   ├── data                <- Scripts to download or generate data
-    │   ├── features            <- Scripts to turn raw data into features for modeling
-    │   ├── models              <- Scripts to train models and then use trained models to make predictions
-    │   └── visualization       <- Scripts to create exploratory and results oriented visualizations
-    ├── tests                   <- Unit tests
-    └── webapp                  <- Web application
-        ├── model_webapp_dir    <- Model web application directory
-        ├── scripts             <- Scripts to run the web application
-        ├── static              <- Static files
-        │   └── css
-        └── templates           <- HTML templates
---------
+```bash
+uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
+```
 
-> <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+Example request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict ^
+  -H "Content-Type: application/json" ^
+  -d "{\"number_vmail_messages\":12,\"total_day_calls\":112,\"total_eve_minutes\":175.5,\"total_eve_charge\":14.92,\"total_intl_minutes\":10.4,\"number_customer_service_calls\":2}"
+```
+
+## Drift Monitoring
+
+Generate the drift report:
+
+```bash
+python src/monitoring/drift_report.py --config params.yaml
+```
+
+Outputs:
+
+- `reports/drift_report.html`
+- `reports/drift_report.json`
+
+The script uses Evidently when the runtime supports it and falls back to a
+lightweight HTML summary if Evidently cannot initialize.
+
+## Interactive Dashboard
+
+```bash
+streamlit run dashboard/streamlit_app.py
+```
+
+The dashboard supports:
+
+- single-customer prediction
+- SHAP top-factor display
+- batch CSV scoring and download
+
+## Monitoring Stack
+
+The API exports:
+
+- `prediction_requests_total`
+- `prediction_errors_total`
+- `model_latency_seconds`
+- `model_error_rate`
+
+Start the full local stack:
+
+```bash
+docker-compose up --build
+```
+
+Services:
+
+- API: `http://localhost:8000`
+- Streamlit: `http://localhost:8501`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+
+## Tests and Lint
+
+```bash
+python -m flake8 --jobs 1 src tests dashboard app.py
+python -m pytest -q tests --basetemp .pytest_run -p no:cacheprovider
+```
+
+## CI
+
+`.github/workflows/ci-cd.yaml` now runs:
+
+- dependency installation
+- data preparation
+- optimized model training
+- drift report generation
+- flake8
+- pytest
+- Docker image build

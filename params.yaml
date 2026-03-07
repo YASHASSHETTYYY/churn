@@ -1,33 +1,52 @@
 external_data_config:
   external_data_csv: data/external/train.csv
 
-raw_data_config: 
+raw_data_config:
   raw_data_csv: data/raw/train.csv
-  model_var: ['churn','number_vmail_messages','total_day_calls','total_eve_minutes','total_eve_charge','total_intl_minutes','number_customer_service_calls']
+  model_var:
+    - churn
+    - number_vmail_messages
+    - total_day_calls
+    - total_eve_minutes
+    - total_eve_charge
+    - total_intl_minutes
+    - number_customer_service_calls
   train_test_split_ratio: 0.2
-  target: churn 
+  target: churn
+  positive_class: "yes"
   random_state: 111
-  new_train_data_csv: data/raw/train_new.csv
 
 processed_data_config:
   train_data_csv: data/processed/churn_train.csv
-  test_data_csv:  data/processed/churn_test.csv
+  test_data_csv: data/processed/churn_test.csv
 
-mlflow_config:
-  artifacts_dir: artifacts
-  experiment_name: model_iteration1
-  run_name: random_forest
-  registered_model_name: random_forest_model
-  remote_server_uri: https://dagshub.com/rohmats/mlops-project-customer-churn.mlflow
- 
-random_forest: 
-  max_depth: 15
-  n_estimators: 30
+training:
+  artifact_path: models/churn_model.joblib
+  metrics_path: reports/model_metrics.json
+  best_params_path: reports/best_params.json
+  n_trials: 50
+  cv_folds: 3
+  n_jobs: 1
+
+random_forest:
+  n_estimators: [80, 240]
+  max_depth: [4, 24]
+  min_samples_split: [2, 20]
+  min_samples_leaf: [1, 10]
+  max_features: ["sqrt", "log2", null]
 
 model_dir: webapp/model_webapp_dir/model.joblib
-
 model_webapp_dir: webapp/model_webapp_dir/model.joblib
 
-model_monitor:
-  target_col_name: target
-  monitor_dashboard_html: reports/data_and_target_drift_dashboard.html
+drift_monitoring:
+  reference_data_csv: data/processed/churn_train.csv
+  current_data_csv: data/processed/churn_test.csv
+  report_html: reports/drift_report.html
+  summary_json: reports/drift_report.json
+
+api:
+  host: 0.0.0.0
+  port: 8000
+
+shap:
+  top_k: 5

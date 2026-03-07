@@ -1,0 +1,9 @@
+.git
+.github
+.dvc
+.pytest_cache
+__pycache__
+*.pyc
+artifacts
+reports/*.html
+webapp/__pycache__

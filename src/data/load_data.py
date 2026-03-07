@@ -1,42 +1,41 @@
-import yaml
+from __future__ import annotations
+
 import argparse
-import pandas as pd 
+import sys
+from pathlib import Path
 
-def read_params(config_path):
-    """
-    read parameters from the params.yaml file
-    input: params.yaml location
-    output: parameters as dictionary
-    """
-    with open(config_path) as yaml_file:
-        config = yaml.safe_load(yaml_file)
-    return config
+import pandas as pd
 
-def load_data(data_path,model_var):
-    """
-    load csv dataset from given path
-    input: csv path 
-    output:pandas dataframe 
-    note: Only 6 variables are used in this model building stage for the simplicity.
-    """
-    df = pd.read_csv(data_path, sep=",", encoding='utf-8')
-    df=df[model_var]
-    return df
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-def load_raw_data(config_path):
-    """
-    load data from external location(data/external) to the raw folder(data/raw) with train and teting dataset 
-    input: config_path 
-    output: save train file in data/raw folder 
-    """
-    config=read_params(config_path)
-    external_data_path=config["external_data_config"]["external_data_csv"]
-    raw_data_path=config["raw_data_config"]["raw_data_csv"]
-    model_var=config["raw_data_config"]["model_var"]
-    
-    df=load_data(external_data_path,model_var)
-    df.to_csv(raw_data_path,index=False)
-    
+from src.config import load_config, resolve_path
+
+
+def load_data(data_path, model_var):
+    """Load the subset of columns used by the churn model."""
+
+    df = pd.read_csv(data_path, sep=",", encoding="utf-8")
+    return df[model_var]
+
+
+def load_raw_data(config_path="params.yaml"):
+    """Copy the selected dataset columns into the raw data directory."""
+
+    config = load_config(config_path)
+    external_data_path = resolve_path(
+        config["external_data_config"]["external_data_csv"],
+        config_path,
+    )
+    raw_data_path = resolve_path(config["raw_data_config"]["raw_data_csv"], config_path)
+    model_var = config["raw_data_config"]["model_var"]
+
+    raw_data_path.parent.mkdir(parents=True, exist_ok=True)
+    df = load_data(external_data_path, model_var)
+    df.to_csv(raw_data_path, index=False)
+
+
 if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument("--config", default="params.yaml")

@@ -1,0 +1,10 @@
+apiVersion: 1
+
+providers:
+  - name: customer-churn
+    orgId: 1
+    folder: Customer Churn
+    type: file
+    disableDeletion: false
+    options:
+      path: /var/lib/grafana/dashboards
