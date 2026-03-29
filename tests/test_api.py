@@ -10,11 +10,24 @@ from src.api import app as api_module
 from src.models.predict import ChurnPredictor
 
 FEATURES = [
+    "state",
+    "account_length",
+    "area_code",
+    "international_plan",
+    "voice_mail_plan",
     "number_vmail_messages",
+    "total_day_minutes",
     "total_day_calls",
+    "total_day_charge",
     "total_eve_minutes",
+    "total_eve_calls",
     "total_eve_charge",
+    "total_night_minutes",
+    "total_night_calls",
+    "total_night_charge",
     "total_intl_minutes",
+    "total_intl_calls",
+    "total_intl_charge",
     "number_customer_service_calls",
 ]
 
@@ -22,11 +35,24 @@ FEATURES = [
 @pytest.fixture()
 def sample_customer() -> dict[str, float]:
     return {
+        "state": "KS",
+        "account_length": 128.0,
+        "area_code": "415",
+        "international_plan": "no",
+        "voice_mail_plan": "yes",
         "number_vmail_messages": 12.0,
+        "total_day_minutes": 265.1,
         "total_day_calls": 112.0,
+        "total_day_charge": 45.07,
         "total_eve_minutes": 175.5,
+        "total_eve_calls": 99.0,
         "total_eve_charge": 14.92,
+        "total_night_minutes": 220.3,
+        "total_night_calls": 91.0,
+        "total_night_charge": 9.91,
         "total_intl_minutes": 10.4,
+        "total_intl_calls": 3.0,
+        "total_intl_charge": 2.81,
         "number_customer_service_calls": 2.0,
     }
 
@@ -35,12 +61,12 @@ def sample_customer() -> dict[str, float]:
 def predictor(tmp_path) -> ChurnPredictor:
     training_frame = pd.DataFrame(
         [
-            [0, 80, 140.0, 12.0, 8.0, 1, "no"],
-            [5, 95, 150.0, 12.8, 9.0, 1, "no"],
-            [10, 110, 180.0, 15.3, 11.0, 2, "yes"],
-            [20, 130, 210.0, 17.9, 12.5, 4, "yes"],
-            [25, 145, 225.0, 19.1, 13.4, 5, "yes"],
-            [2, 90, 145.0, 12.3, 8.7, 1, "no"],
+            ["KS", 100, "415", "no", "yes", 0, 180.0, 80, 30.6, 140.0, 90, 11.9, 180.0, 100, 8.1, 8.0, 2, 2.16, 1, "no"],
+            ["OH", 110, "408", "no", "yes", 5, 190.0, 95, 32.3, 150.0, 95, 12.8, 185.0, 98, 8.33, 9.0, 3, 2.43, 1, "no"],
+            ["NJ", 120, "415", "yes", "no", 10, 240.0, 110, 40.8, 180.0, 100, 15.3, 210.0, 105, 9.45, 11.0, 4, 2.97, 2, "yes"],
+            ["CA", 130, "510", "yes", "no", 20, 260.0, 130, 44.2, 210.0, 110, 17.9, 220.0, 108, 9.9, 12.5, 5, 3.38, 4, "yes"],
+            ["TX", 145, "415", "yes", "yes", 25, 280.0, 145, 47.6, 225.0, 120, 19.1, 230.0, 112, 10.35, 13.4, 6, 3.62, 5, "yes"],
+            ["WA", 90, "408", "no", "yes", 2, 185.0, 90, 31.45, 145.0, 92, 12.3, 182.0, 96, 8.19, 8.7, 2, 2.35, 1, "no"],
         ],
         columns=FEATURES + ["churn"],
     )

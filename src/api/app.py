@@ -48,11 +48,24 @@ app = FastAPI(
 class CustomerData(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    state: Annotated[str, Field(min_length=1)]
+    account_length: Annotated[float, Field(ge=0)]
+    area_code: Annotated[str, Field(min_length=1)]
+    international_plan: Annotated[str, Field(min_length=1)]
+    voice_mail_plan: Annotated[str, Field(min_length=1)]
     number_vmail_messages: Annotated[float, Field(ge=0)]
+    total_day_minutes: Annotated[float, Field(ge=0)]
     total_day_calls: Annotated[float, Field(ge=0)]
+    total_day_charge: Annotated[float, Field(ge=0)]
     total_eve_minutes: Annotated[float, Field(ge=0)]
+    total_eve_calls: Annotated[float, Field(ge=0)]
     total_eve_charge: Annotated[float, Field(ge=0)]
+    total_night_minutes: Annotated[float, Field(ge=0)]
+    total_night_calls: Annotated[float, Field(ge=0)]
+    total_night_charge: Annotated[float, Field(ge=0)]
     total_intl_minutes: Annotated[float, Field(ge=0)]
+    total_intl_calls: Annotated[float, Field(ge=0)]
+    total_intl_charge: Annotated[float, Field(ge=0)]
     number_customer_service_calls: Annotated[float, Field(ge=0)]
 
 

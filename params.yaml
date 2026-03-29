@@ -4,13 +4,26 @@ external_data_config:
 raw_data_config:
   raw_data_csv: data/raw/train.csv
   model_var:
-    - churn
+    - state
+    - account_length
+    - area_code
+    - international_plan
+    - voice_mail_plan
     - number_vmail_messages
+    - total_day_minutes
     - total_day_calls
+    - total_day_charge
     - total_eve_minutes
+    - total_eve_calls
     - total_eve_charge
+    - total_night_minutes
+    - total_night_calls
+    - total_night_charge
     - total_intl_minutes
+    - total_intl_calls
+    - total_intl_charge
     - number_customer_service_calls
+    - churn
   train_test_split_ratio: 0.2
   target: churn
   positive_class: "yes"

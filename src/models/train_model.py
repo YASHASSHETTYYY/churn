@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 from pathlib import Path
 
 import joblib
-import optuna
 import pandas as pd
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
@@ -18,6 +20,13 @@ from sklearn.metrics import (
     recall_score,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
+
+try:
+    import optuna
+except ImportError:  # pragma: no cover - optional in some local envs
+    optuna = None
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -81,8 +90,82 @@ def get_search_space(trial: optuna.Trial, rf_config: dict) -> dict:
     }
 
 
+def sample_search_space(rng: random.Random, rf_config: dict) -> dict:
+    return {
+        "n_estimators": rng.randint(
+            rf_config["n_estimators"][0],
+            rf_config["n_estimators"][1],
+        ),
+        "max_depth": rng.randint(
+            rf_config["max_depth"][0],
+            rf_config["max_depth"][1],
+        ),
+        "min_samples_split": rng.randint(
+            rf_config["min_samples_split"][0],
+            rf_config["min_samples_split"][1],
+        ),
+        "min_samples_leaf": rng.randint(
+            rf_config["min_samples_leaf"][0],
+            rf_config["min_samples_leaf"][1],
+        ),
+        "max_features": rng.choice(rf_config["max_features"]),
+    }
+
+
+def build_training_pipeline(
+    train_x: pd.DataFrame,
+    random_state: int,
+    n_jobs: int,
+    estimator_params: dict,
+) -> Pipeline:
+    numeric_features = train_x.select_dtypes(include=["number"]).columns.tolist()
+    categorical_features = [
+        column for column in train_x.columns if column not in numeric_features
+    ]
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "num",
+                Pipeline(
+                    steps=[
+                        ("imputer", SimpleImputer(strategy="median")),
+                    ]
+                ),
+                numeric_features,
+            ),
+            (
+                "cat",
+                Pipeline(
+                    steps=[
+                        ("imputer", SimpleImputer(strategy="most_frequent")),
+                        (
+                            "encoder",
+                            OneHotEncoder(handle_unknown="ignore"),
+                        ),
+                    ]
+                ),
+                categorical_features,
+            ),
+        ]
+    )
+
+    classifier = RandomForestClassifier(
+        random_state=random_state,
+        class_weight="balanced",
+        n_jobs=n_jobs,
+        **estimator_params,
+    )
+    return Pipeline(
+        steps=[
+            ("preprocessor", preprocessor),
+            ("classifier", classifier),
+        ]
+    )
+
+
 def evaluate_model(
-    model: RandomForestClassifier,
+    model,
     test_x: pd.DataFrame,
     test_y: pd.Series,
 ) -> dict:
@@ -154,13 +237,15 @@ def train_and_evaluate(
         random_state=random_state,
     )
 
-    def objective(trial: optuna.Trial) -> float:
-        search_params = get_search_space(trial, rf_config)
-        model = RandomForestClassifier(
+    best_params: dict | None = None
+    best_score = float("-inf")
+
+    def score_params(search_params: dict) -> float:
+        model = build_training_pipeline(
+            train_x=train_x,
             random_state=random_state,
-            class_weight="balanced",
             n_jobs=n_jobs,
-            **search_params,
+            estimator_params=search_params,
         )
         scores = cross_val_score(
             model,
@@ -172,22 +257,39 @@ def train_and_evaluate(
         )
         return float(scores.mean())
 
-    study = optuna.create_study(
-        direction="maximize",
-        sampler=optuna.samplers.TPESampler(seed=random_state),
-    )
-    study.optimize(objective, n_trials=requested_trials)
+    if optuna is not None:
+        def objective(trial: optuna.Trial) -> float:
+            search_params = get_search_space(trial, rf_config)
+            return score_params(search_params)
 
-    best_params = study.best_params
-    model = RandomForestClassifier(
+        study = optuna.create_study(
+            direction="maximize",
+            sampler=optuna.samplers.TPESampler(seed=random_state),
+        )
+        study.optimize(objective, n_trials=requested_trials)
+        best_params = study.best_params
+        best_score = float(study.best_value)
+    else:
+        rng = random.Random(random_state)
+        for _ in range(requested_trials):
+            search_params = sample_search_space(rng, rf_config)
+            score = score_params(search_params)
+            if score > best_score:
+                best_params = search_params
+                best_score = score
+
+    if best_params is None:
+        raise RuntimeError("Unable to determine model hyperparameters.")
+
+    model = build_training_pipeline(
+        train_x=train_x,
         random_state=random_state,
-        class_weight="balanced",
         n_jobs=n_jobs,
-        **best_params,
+        estimator_params=best_params,
     )
     model.fit(train_x, train_y)
     metrics = evaluate_model(model, test_x, test_y)
-    metrics["best_cv_score"] = float(study.best_value)
+    metrics["best_cv_score"] = best_score
     metrics["n_trials"] = requested_trials
 
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
@@ -198,6 +300,9 @@ def train_and_evaluate(
         "model": model,
         "metadata": {
             "feature_names": train_x.columns.tolist(),
+            "feature_dtypes": {
+                column: str(dtype) for column, dtype in train_x.dtypes.items()
+            },
             "target": target,
             "positive_label": positive_label,
         },

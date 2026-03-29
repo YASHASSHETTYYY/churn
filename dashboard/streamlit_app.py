@@ -35,43 +35,29 @@ def default_value(column: str, reference_data: pd.DataFrame) -> float:
     return 0.0
 
 
-def render_sidebar(reference_data: pd.DataFrame) -> dict[str, float]:
+def render_sidebar(
+    predictor: ChurnPredictor,
+    reference_data: pd.DataFrame,
+) -> dict[str, object]:
     st.sidebar.header("Customer Profile")
-    return {
-        "number_vmail_messages": st.sidebar.number_input(
-            "Voice mail messages",
-            min_value=0.0,
-            value=default_value("number_vmail_messages", reference_data),
-            step=1.0,
-        ),
-        "total_day_calls": st.sidebar.number_input(
-            "Day calls",
-            min_value=0.0,
-            value=default_value("total_day_calls", reference_data),
-            step=1.0,
-        ),
-        "total_eve_minutes": st.sidebar.number_input(
-            "Evening minutes",
-            min_value=0.0,
-            value=default_value("total_eve_minutes", reference_data),
-        ),
-        "total_eve_charge": st.sidebar.number_input(
-            "Evening charge",
-            min_value=0.0,
-            value=default_value("total_eve_charge", reference_data),
-        ),
-        "total_intl_minutes": st.sidebar.number_input(
-            "International minutes",
-            min_value=0.0,
-            value=default_value("total_intl_minutes", reference_data),
-        ),
-        "number_customer_service_calls": st.sidebar.number_input(
-            "Customer service calls",
-            min_value=0.0,
-            value=default_value("number_customer_service_calls", reference_data),
-            step=1.0,
-        ),
-    }
+    customer: dict[str, object] = {}
+    for column in predictor.feature_names:
+        if column in reference_data and pd.api.types.is_numeric_dtype(reference_data[column]):
+            customer[column] = st.sidebar.number_input(
+                column.replace("_", " ").title(),
+                min_value=0.0,
+                value=default_value(column, reference_data),
+            )
+        else:
+            options = [""] if column not in reference_data else sorted(
+                reference_data[column].dropna().astype(str).unique().tolist()
+            )
+            customer[column] = st.sidebar.selectbox(
+                column.replace("_", " ").title(),
+                options=options,
+                index=0,
+            )
+    return customer
 
 
 def main():
@@ -84,7 +70,7 @@ def main():
 
     predictor = load_predictor()
     reference_data = load_reference_data()
-    customer = render_sidebar(reference_data)
+    customer = render_sidebar(predictor, reference_data)
 
     left, right = st.columns([1.1, 1.4])
 
