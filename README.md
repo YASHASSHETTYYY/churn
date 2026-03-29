@@ -7,6 +7,10 @@ full machine learning lifecycle: data validation, model training,
 hyperparameter optimization, API serving, explainability, monitoring,
 containerization, and CI/CD automation.
 
+The current codebase trains on the full churn feature set with preprocessing
+for categorical and numeric columns, then serves predictions through FastAPI
+and Streamlit.
+
 ## Overview
 
 This repository goes beyond offline model training. It packages the churn model
@@ -14,7 +18,7 @@ as a deployable service and adds the operational pieces expected in a real MLOps
 system:
 
 - validated input data and reproducible training steps
-- Optuna-based hyperparameter optimization
+- preprocessing-aware Random Forest training with hyperparameter search
 - FastAPI prediction service with batch scoring
 - SHAP explanations for individual predictions
 - drift reporting for production monitoring
@@ -24,7 +28,7 @@ system:
 
 ## Tech Stack
 
-- Python 3.11
+- Python 3.10 or 3.11
 - scikit-learn
 - Optuna
 - FastAPI
@@ -42,13 +46,26 @@ system:
 ## Problem Statement
 
 The project predicts whether a telecom customer is likely to churn. The current
-training pipeline uses the selected model variables below:
+training pipeline uses the full customer feature set below:
 
+- `state`
+- `account_length`
+- `area_code`
+- `international_plan`
+- `voice_mail_plan`
 - `number_vmail_messages`
+- `total_day_minutes`
 - `total_day_calls`
+- `total_day_charge`
 - `total_eve_minutes`
+- `total_eve_calls`
 - `total_eve_charge`
+- `total_night_minutes`
+- `total_night_calls`
+- `total_night_charge`
 - `total_intl_minutes`
+- `total_intl_calls`
+- `total_intl_charge`
 - `number_customer_service_calls`
 
 Target:
@@ -58,6 +75,20 @@ Target:
 Positive class:
 
 - `yes`
+
+## Model Notes
+
+The repository previously stored a metrics report with about `80.35%` accuracy
+for an older 6-feature model configuration. The current training code has been
+updated to use the full feature set with categorical preprocessing.
+
+In local benchmarking on the current data split, this updated approach reached:
+
+- about `96.35%` test accuracy with the Random Forest pipeline
+- about `96.47%` test accuracy with a Gradient Boosting benchmark
+
+The official project accuracy remains whatever is currently written in
+`reports/model_metrics.json` until training is rerun in your environment.
 
 ## Architecture
 
@@ -109,9 +140,14 @@ flowchart LR
 
 ### 1. Hyperparameter Optimization
 
-The training pipeline uses Optuna with Bayesian optimization to search for
-better Random Forest hyperparameters. Best parameters and evaluation metrics are
-saved automatically.
+The training pipeline builds a preprocessing + Random Forest pipeline:
+
+- numeric columns are median-imputed
+- categorical columns are imputed and one-hot encoded
+- Random Forest hyperparameters are searched with Optuna when available
+- if Optuna is missing, the code falls back to a reproducible random search
+
+Best parameters and evaluation metrics are saved automatically.
 
 Generated outputs:
 
@@ -192,6 +228,7 @@ Project configuration lives in `params.yaml`.
 
 Important settings:
 
+- raw feature columns used for training
 - training artifacts path
 - number of Optuna trials
 - cross-validation folds
@@ -203,13 +240,13 @@ Important settings:
 
 Recommended environment:
 
-- Python 3.11
+- Python 3.10 or 3.11
 
 Create and activate a virtual environment:
 
 ```powershell
-cd d:\mlops_project\mlops-project-customer-churn
-py -3.11 -m venv .venv
+cd "c:\Users\pritish\OneDrive\Desktop\MLOPS yashas\churn"
+py -3.10 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m ensurepip --upgrade
 python -m pip install --upgrade pip setuptools wheel
@@ -234,7 +271,7 @@ python src\data\split_data.py --config params.yaml
 ### Step 3. Train The Model
 
 ```powershell
-python src\models\train_model.py --config params.yaml --n-trials 10
+python -m src.models.train_model --config params.yaml --n-trials 50
 ```
 
 ### Step 4. Generate Drift Report
@@ -260,7 +297,7 @@ Open:
 ```powershell
 curl -X POST "http://127.0.0.1:8000/predict" `
   -H "Content-Type: application/json" `
-  -d "{\"number_vmail_messages\":12,\"total_day_calls\":112,\"total_eve_minutes\":175.5,\"total_eve_charge\":14.92,\"total_intl_minutes\":10.4,\"number_customer_service_calls\":2}"
+  -d "{\"state\":\"KS\",\"account_length\":128,\"area_code\":\"415\",\"international_plan\":\"no\",\"voice_mail_plan\":\"yes\",\"number_vmail_messages\":12,\"total_day_minutes\":265.1,\"total_day_calls\":112,\"total_day_charge\":45.07,\"total_eve_minutes\":175.5,\"total_eve_calls\":99,\"total_eve_charge\":14.92,\"total_night_minutes\":220.3,\"total_night_calls\":91,\"total_night_charge\":9.91,\"total_intl_minutes\":10.4,\"total_intl_calls\":3,\"total_intl_charge\":2.81,\"number_customer_service_calls\":2}"
 ```
 
 ### Example Batch Request
@@ -269,19 +306,45 @@ curl -X POST "http://127.0.0.1:8000/predict" `
 {
   "customers": [
     {
+      "state": "KS",
+      "account_length": 128,
+      "area_code": "415",
+      "international_plan": "no",
+      "voice_mail_plan": "yes",
       "number_vmail_messages": 12,
+      "total_day_minutes": 265.1,
       "total_day_calls": 112,
+      "total_day_charge": 45.07,
       "total_eve_minutes": 175.5,
+      "total_eve_calls": 99,
       "total_eve_charge": 14.92,
+      "total_night_minutes": 220.3,
+      "total_night_calls": 91,
+      "total_night_charge": 9.91,
       "total_intl_minutes": 10.4,
+      "total_intl_calls": 3,
+      "total_intl_charge": 2.81,
       "number_customer_service_calls": 2
     },
     {
+      "state": "CA",
+      "account_length": 95,
+      "area_code": "408",
+      "international_plan": "yes",
+      "voice_mail_plan": "no",
       "number_vmail_messages": 0,
+      "total_day_minutes": 310.4,
       "total_day_calls": 90,
+      "total_day_charge": 52.77,
       "total_eve_minutes": 210.0,
+      "total_eve_calls": 105,
       "total_eve_charge": 17.85,
+      "total_night_minutes": 240.5,
+      "total_night_calls": 110,
+      "total_night_charge": 10.82,
       "total_intl_minutes": 13.1,
+      "total_intl_calls": 5,
+      "total_intl_charge": 3.54,
       "number_customer_service_calls": 4
     }
   ]
@@ -293,7 +356,7 @@ curl -X POST "http://127.0.0.1:8000/predict" `
 In a second terminal:
 
 ```powershell
-cd d:\mlops_project\mlops-project-customer-churn
+cd "c:\Users\pritish\OneDrive\Desktop\MLOPS yashas\churn"
 .venv\Scripts\Activate.ps1
 python -m streamlit run dashboard\streamlit_app.py
 ```
@@ -379,8 +442,9 @@ python -m pip install -r requirements.txt
 
 ### Python 3.13 compatibility
 
-Use Python 3.11 for local development. Some monitoring dependencies, especially
-Evidently, can fail on Python 3.13 depending on the installed package set.
+Use Python 3.10 or 3.11 for local development. Some monitoring dependencies,
+especially Evidently, can fail on Python 3.13 depending on the installed
+package set.
 
 ### GitHub Actions publish and deploy
 
