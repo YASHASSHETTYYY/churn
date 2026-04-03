@@ -188,12 +188,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: >
-      (github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.publish_image == 'true') ||
-      (github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      vars.AUTO_PUBLISH_IMAGE == 'true')
 
     steps:
       - uses: actions/checkout@v4
@@ -202,6 +196,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
+        if: >
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.publish_image == 'true')
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -209,6 +207,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push release image
+        if: >
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.publish_image == 'true')
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -218,25 +220,51 @@ jobs:
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:latest
 
+      - name: Skip image publish for pull requests or disabled manual runs
+        if: >
+          !(
+            (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+            (github.event_name == 'workflow_dispatch' &&
+            github.event.inputs.publish_image == 'true')
+          )
+        run: echo "Image publishing is disabled for this event, so the job completes without pushing."
+
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
     needs: publish_image
-    if: >
-      needs.publish_image.result == 'success' &&
-      github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.trigger_deploy == 'true'
     env:
       DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
 
     steps:
       - name: Trigger runtime deployment
-        if: env.DEPLOY_WEBHOOK_URL != ''
+        if: >
+          (
+            (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+            (github.event_name == 'workflow_dispatch' &&
+            github.event.inputs.trigger_deploy == 'true')
+          ) &&
+          env.DEPLOY_WEBHOOK_URL != ''
         run: |
           curl -X POST "$DEPLOY_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{\"image\":\"${{ env.IMAGE_NAME }}:${{ github.sha }}\"}"
 
       - name: Skip deployment when webhook is not configured
-        if: env.DEPLOY_WEBHOOK_URL == ''
+        if: >
+          (
+            (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+            (github.event_name == 'workflow_dispatch' &&
+            github.event.inputs.trigger_deploy == 'true')
+          ) &&
+          env.DEPLOY_WEBHOOK_URL == ''
         run: echo "DEPLOY_WEBHOOK_URL is not configured; skipping deploy."
+
+      - name: Skip deployment for pull requests or disabled manual runs
+        if: >
+          !(
+            (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+            (github.event_name == 'workflow_dispatch' &&
+            github.event.inputs.trigger_deploy == 'true')
+          )
+        run: echo "Deployment is disabled for this event, so the job completes without calling the webhook."
