@@ -10,6 +10,10 @@ httpx
 numpy
 pandas
 scikit-learn
+xgboost
+lightgbm
+catboost
+imbalanced-learn
 joblib
 pyyaml
 optuna

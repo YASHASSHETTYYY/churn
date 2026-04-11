@@ -1,0 +1,11 @@
+rank,feature,mean_abs_shap,direction,business_interpretation,interaction_feature
+1,number_customer_service_calls,0.9978678337321523,Higher values increase churn risk,Repeated support contacts suggest unresolved service friction and a higher chance of switching.,total_day_calls
+2,international_plan,0.7883986128396236,yes is associated with higher churn risk,International-plan customers may face pricing or package-fit concerns that make churn more likely.,total_night_minutes
+3,area_code,0.6441248886509874,Mixed or non-linear effect,"Regional variation may reflect local competition, coverage quality, or pricing pressure.",total_day_calls
+4,total_day_minutes,0.5615014157235672,Higher values increase churn risk,Heavy daytime usage increases bill exposure and can signal plan mismatch or price sensitivity.,total_day_charge
+5,total_day_charge,0.4433841120839332,Higher values increase churn risk,Heavy daytime usage increases bill exposure and can signal plan mismatch or price sensitivity.,total_day_minutes
+6,voice_mail_plan,0.36889734129630963,no is associated with higher churn risk,Voice-mail adoption often reflects product engagement and can separate sticky users from low-engagement accounts.,number_vmail_messages
+7,total_intl_calls,0.2660247753442771,Higher values reduce churn risk,International calling frequency captures how central the service is to the customer's routine and whether the plan still fits that need.,total_eve_charge
+8,state,0.25628053056478406,CA is associated with higher churn risk,"Regional variation may reflect local competition, coverage quality, or pricing pressure.",total_night_charge
+9,total_eve_charge,0.16283838194553563,Higher values increase churn risk,Evening usage captures engagement intensity and may reveal whether the tariff structure fits customer habits.,total_eve_minutes
+10,total_eve_minutes,0.1406340316062383,Higher values increase churn risk,Evening usage captures engagement intensity and may reveal whether the tariff structure fits customer habits.,total_eve_charge

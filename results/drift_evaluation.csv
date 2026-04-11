@@ -1,0 +1,7 @@
+detector,scenario,feature_drifted,magnitude,true_drift_start,detected_at_batch,latency_records,p_value,drift_score,detected
+evidently,gradual,total_day_minutes,0.2,1360,4.0,340.0,0.0339671949837952,0.0339671949837952,True
+psi,gradual,total_day_minutes,0.2,1360,,,,0.005725671852690698,False
+evidently,sudden,international_plan,0.2,1360,3.0,140.0,0.024413979915690366,0.024413979915690366,True
+psi,sudden,international_plan,0.2,1360,,,,0.019037037696431895,False
+evidently,seasonal,number_customer_service_calls,0.2,1360,3.0,140.0,0.041305116934372395,0.041305116934372395,True
+psi,seasonal,number_customer_service_calls,0.2,1360,,,,0.006871921678238956,False
