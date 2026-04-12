@@ -148,7 +148,12 @@ def audit_sensitive_feature(
         columns={feature_name: "group"}
     )
     report["auc_roc"] = auc_frame.by_group["auc_roc"].to_numpy()
-    counts = sensitive_series.astype(str).value_counts().rename_axis("group").reset_index(name="n_samples")
+    counts = (
+        sensitive_series.astype(str)
+        .value_counts()
+        .rename_axis("group")
+        .reset_index(name="n_samples")
+    )
     report["group"] = report["group"].astype(str)
     report = report.merge(counts, on="group", how="left")
     report["sensitive_feature"] = feature_name
@@ -229,7 +234,8 @@ def build_tradeoff_markdown(
         "Interpretation:\n"
         f"- AUC-ROC changed by **{auc_delta:+.4f}** after the fairness constraint.\n"
         f"- Maximum TPR disparity changed by **{disparity_delta:+.4f}**.\n"
-        "- This baseline is intended as a fairness-aware reference point rather than the final deployment model.\n"
+        "- This baseline is intended as a fairness-aware reference point rather than "
+        "the final deployment model.\n"
     )
 
 
@@ -331,4 +337,3 @@ if __name__ == "__main__":
         results_dir=args.results_dir,
         validation_size=args.validation_size,
     )
-

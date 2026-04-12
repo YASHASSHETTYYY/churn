@@ -4,7 +4,7 @@ import argparse
 import math
 import sys
 from pathlib import Path
-from typing import Callable, Any
+from typing import Any, Callable
 
 import matplotlib
 
@@ -100,6 +100,29 @@ def _latency_records(true_drift_start: int, detected_end_row: int | None) -> flo
     return float(detected_end_row - true_drift_start)
 
 
+def _build_evidently_detector(
+    feature_name: str,
+) -> Callable[[pd.Series, pd.Series], dict[str, Any]]:
+    def detector(expected: pd.Series, actual: pd.Series) -> dict[str, Any]:
+        return run_evidently_feature_drift(
+            reference_data=pd.DataFrame({feature_name: expected}),
+            current_data=pd.DataFrame({feature_name: actual}),
+            feature_name=feature_name,
+        )
+
+    return detector
+
+
+def _build_psi_detector() -> Callable[[pd.Series, pd.Series], dict[str, Any]]:
+    def detector(expected: pd.Series, actual: pd.Series) -> dict[str, Any]:
+        return {
+            **detect_psi_drift(expected, actual),
+            "p_value": np.nan,
+        }
+
+    return detector
+
+
 def evaluate_detector_over_stream(
     detector_name: str,
     detector: Callable[[pd.Series, pd.Series], dict[str, Any]],
@@ -179,16 +202,9 @@ def evaluate_drift_scenarios(
 
         for detector_name in ["evidently", "psi"]:
             if detector_name == "evidently":
-                detector = lambda expected, actual, current_feature=feature_name: run_evidently_feature_drift(
-                    reference_data=pd.DataFrame({current_feature: expected}),
-                    current_data=pd.DataFrame({current_feature: actual}),
-                    feature_name=current_feature,
-                )
+                detector = _build_evidently_detector(feature_name)
             else:
-                detector = lambda expected, actual: {
-                    **detect_psi_drift(expected, actual),
-                    "p_value": np.nan,
-                }
+                detector = _build_psi_detector()
 
             rows.append(
                 evaluate_detector_over_stream(
@@ -226,16 +242,9 @@ def run_clean_false_positive_checks(
         )
         for detector_name in ["evidently", "psi"]:
             if detector_name == "evidently":
-                detector = lambda expected, actual: run_evidently_feature_drift(
-                    reference_data=pd.DataFrame({feature_name: expected}),
-                    current_data=pd.DataFrame({feature_name: actual}),
-                    feature_name=feature_name,
-                )
+                detector = _build_evidently_detector(feature_name)
             else:
-                detector = lambda expected, actual: {
-                    **detect_psi_drift(expected, actual),
-                    "p_value": np.nan,
-                }
+                detector = _build_psi_detector()
 
             rows.append(
                 evaluate_detector_over_stream(
@@ -293,14 +302,23 @@ def build_sensitivity_summary(
                     "magnitude": magnitude,
                     "detection_rate": float(true_detection_mask.mean()),
                     "false_positive_rate": float(clean_rows["detected"].mean()),
-                    "mean_latency": float(mean_latency) if not math.isnan(mean_latency) else np.nan,
+                    "mean_latency": (
+                        float(mean_latency) if not math.isnan(mean_latency) else np.nan
+                    ),
                 }
             )
 
     return pd.DataFrame(rows)
 
 
-def _draw_heatmap(ax, matrix: np.ndarray, row_labels: list[str], col_labels: list[str], title: str, fmt: str) -> None:
+def _draw_heatmap(
+    ax,
+    matrix: np.ndarray,
+    row_labels: list[str],
+    col_labels: list[str],
+    title: str,
+    fmt: str,
+) -> None:
     image = ax.imshow(matrix, aspect="auto", cmap="YlOrRd")
     ax.set_title(title)
     ax.set_xticks(np.arange(len(col_labels)))
@@ -312,7 +330,15 @@ def _draw_heatmap(ax, matrix: np.ndarray, row_labels: list[str], col_labels: lis
         for col_index in range(matrix.shape[1]):
             value = matrix[row_index, col_index]
             label = "n/a" if np.isnan(value) else format(value, fmt)
-            ax.text(col_index, row_index, label, ha="center", va="center", color="black", fontsize=9)
+            ax.text(
+                col_index,
+                row_index,
+                label,
+                ha="center",
+                va="center",
+                color="black",
+                fontsize=9,
+            )
 
     plt.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
 
@@ -361,9 +387,30 @@ def save_sensitivity_heatmap(summary_df: pd.DataFrame, output_path: Path) -> Non
 
     figure, axes = plt.subplots(1, 3, figsize=(16, 5))
     detector_labels = [detector.title() for detector in detectors]
-    _draw_heatmap(axes[0], detection_matrix, detector_labels, magnitude_labels, "Detection Rate", ".2f")
-    _draw_heatmap(axes[1], false_positive_matrix, detector_labels, magnitude_labels, "False Positive Rate", ".2f")
-    _draw_heatmap(axes[2], latency_matrix, detector_labels, magnitude_labels, "Mean Latency (records)", ".0f")
+    _draw_heatmap(
+        axes[0],
+        detection_matrix,
+        detector_labels,
+        magnitude_labels,
+        "Detection Rate",
+        ".2f",
+    )
+    _draw_heatmap(
+        axes[1],
+        false_positive_matrix,
+        detector_labels,
+        magnitude_labels,
+        "False Positive Rate",
+        ".2f",
+    )
+    _draw_heatmap(
+        axes[2],
+        latency_matrix,
+        detector_labels,
+        magnitude_labels,
+        "Mean Latency (records)",
+        ".0f",
+    )
     figure.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=300, bbox_inches="tight")

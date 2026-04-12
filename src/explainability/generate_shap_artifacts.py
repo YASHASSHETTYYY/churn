@@ -56,7 +56,11 @@ def _aggregate_shap_values(
     return aggregated
 
 
-def _normalize_shap_output(shap_output, expected_value, positive_index: int) -> tuple[np.ndarray, float]:
+def _normalize_shap_output(
+    shap_output,
+    expected_value,
+    positive_index: int,
+) -> tuple[np.ndarray, float]:
     if isinstance(shap_output, list):
         values = np.asarray(shap_output[positive_index], dtype=float)
         base_value = float(np.asarray(expected_value)[positive_index])
@@ -154,4 +158,3 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="params.yaml")
     args = parser.parse_args()
     run_shap_stage(config_path=args.config)
-

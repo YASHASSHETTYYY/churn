@@ -13,7 +13,10 @@ def compute_psi(expected, actual, buckets: int = 10) -> float:
 
     epsilon = 1e-6
 
-    if pd.api.types.is_numeric_dtype(expected_series) and pd.api.types.is_numeric_dtype(actual_series):
+    if (
+        pd.api.types.is_numeric_dtype(expected_series)
+        and pd.api.types.is_numeric_dtype(actual_series)
+    ):
         percentiles = np.linspace(0, 100, buckets + 1)
         bin_edges = np.unique(np.percentile(expected_series.astype(float), percentiles))
         if bin_edges.size < 2:

@@ -103,7 +103,11 @@ def _save_snapshot_html(snapshot, report_path: Path, report) -> None:
     raise EvidentlyDriftError("Unable to save Evidently HTML report.")
 
 
-def _find_metric_entry(report_dict: dict[str, Any], metric_types: set[str], column: str | None) -> dict[str, Any] | None:
+def _find_metric_entry(
+    report_dict: dict[str, Any],
+    metric_types: set[str],
+    column: str | None,
+) -> dict[str, Any] | None:
     for metric in report_dict.get("metrics", []):
         config = metric.get("config", {})
         metric_type = str(config.get("type", ""))

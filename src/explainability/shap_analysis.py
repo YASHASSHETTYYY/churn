@@ -194,7 +194,9 @@ def choose_explainer(
     if is_tree_estimator(estimator):
         return shap.TreeExplainer(estimator), "TreeExplainer"
 
-    if torch is not None and isinstance(estimator, torch.nn.Module):  # pragma: no cover - future-proof
+    if (
+        torch is not None and isinstance(estimator, torch.nn.Module)
+    ):  # pragma: no cover - future-proof
         background_tensor = torch.tensor(background_data, dtype=torch.float32)
         return shap.DeepExplainer(estimator, background_tensor), "DeepExplainer"
 
@@ -242,7 +244,11 @@ def compute_shap_values(
         test_tensor = torch.tensor(transformed_test, dtype=torch.float32)
         shap_output = explainer.shap_values(test_tensor)
         expected_value = explainer.expected_value
-        return _normalize_shap_output(shap_output, expected_value, positive_index=positive_index)
+        return _normalize_shap_output(
+            shap_output,
+            expected_value,
+            positive_index=positive_index,
+        )
 
     shap_output = explainer.shap_values(transformed_test)
     expected_value = getattr(explainer, "expected_value", 0.0)
@@ -251,7 +257,10 @@ def compute_shap_values(
 
 def infer_feature_direction(feature: pd.Series, shap_column: np.ndarray) -> str:
     non_null_feature = feature.copy()
-    if pd.api.types.is_numeric_dtype(non_null_feature) and non_null_feature.nunique(dropna=True) > 5:
+    if (
+        pd.api.types.is_numeric_dtype(non_null_feature)
+        and non_null_feature.nunique(dropna=True) > 5
+    ):
         correlation = pd.Series(non_null_feature).corr(pd.Series(shap_column), method="spearman")
         if pd.isna(correlation) or abs(float(correlation)) < 0.05:
             return "Mixed or non-linear effect"
@@ -280,31 +289,64 @@ def infer_feature_direction(feature: pd.Series, shap_column: np.ndarray) -> str:
     return f"{top_category} is associated with higher churn risk"
 
 
-def infer_business_interpretation(feature_name: str) -> str:
+def infer_business_interpretation(feature_name: str) -> str:  # noqa: C901
     lowered = feature_name.lower()
     if "customer_service" in lowered:
-        return "Repeated support contacts suggest unresolved service friction and a higher chance of switching."
+        return (
+            "Repeated support contacts suggest unresolved service friction and a higher "
+            "chance of switching."
+        )
     if "international_plan" in lowered:
-        return "International-plan customers may face pricing or package-fit concerns that make churn more likely."
+        return (
+            "International-plan customers may face pricing or package-fit concerns that "
+            "make churn more likely."
+        )
     if "total_intl_calls" in lowered:
-        return "International calling frequency captures how central the service is to the customer's routine and whether the plan still fits that need."
+        return (
+            "International calling frequency captures how central the service is to the "
+            "customer's routine and whether the plan still fits that need."
+        )
     if "total_intl_charge" in lowered or "total_intl_minutes" in lowered:
-        return "International usage and charges can create billing pressure that pushes customers toward competitors."
+        return (
+            "International usage and charges can create billing pressure that pushes "
+            "customers toward competitors."
+        )
     if "total_day" in lowered:
-        return "Heavy daytime usage increases bill exposure and can signal plan mismatch or price sensitivity."
+        return (
+            "Heavy daytime usage increases bill exposure and can signal plan mismatch "
+            "or price sensitivity."
+        )
     if "total_eve" in lowered:
-        return "Evening usage captures engagement intensity and may reveal whether the tariff structure fits customer habits."
+        return (
+            "Evening usage captures engagement intensity and may reveal whether the "
+            "tariff structure fits customer habits."
+        )
     if "total_night" in lowered:
-        return "Night-time usage reflects off-peak behavior and can indicate whether customers are using the plan efficiently."
+        return (
+            "Night-time usage reflects off-peak behavior and can indicate whether "
+            "customers are using the plan efficiently."
+        )
     if "voice_mail_plan" in lowered:
-        return "Voice-mail adoption often reflects product engagement and can separate sticky users from low-engagement accounts."
+        return (
+            "Voice-mail adoption often reflects product engagement and can separate "
+            "sticky users from low-engagement accounts."
+        )
     if "vmail" in lowered:
         return "Voice-mail activity is a proxy for service adoption and customer engagement."
     if "account_length" in lowered:
-        return "Tenure captures relationship maturity; shorter relationships typically have weaker loyalty."
+        return (
+            "Tenure captures relationship maturity; shorter relationships typically "
+            "have weaker loyalty."
+        )
     if lowered in {"state", "area_code"}:
-        return "Regional variation may reflect local competition, coverage quality, or pricing pressure."
-    return "This feature helps differentiate churn risk by capturing customer behavior or plan fit."
+        return (
+            "Regional variation may reflect local competition, coverage quality, or "
+            "pricing pressure."
+        )
+    return (
+        "This feature helps differentiate churn risk by capturing customer behavior "
+        "or plan fit."
+    )
 
 
 def feature_theme(feature_name: str) -> str:
@@ -421,7 +463,10 @@ def save_dependence_plots(
             show=False,
         )
         plt.title(
-            f"{humanize_feature_name(feature_name)} vs {humanize_feature_name(interaction_feature)}",
+            (
+                f"{humanize_feature_name(feature_name)} vs "
+                f"{humanize_feature_name(interaction_feature)}"
+            ),
             fontsize=12,
         )
         plt.tight_layout()
@@ -503,7 +548,7 @@ def save_waterfall_plots(
     return output_paths
 
 
-def build_recommendations(top_features: pd.DataFrame) -> list[str]:
+def build_recommendations(top_features: pd.DataFrame) -> list[str]:  # noqa: C901
     ordered_themes = list(
         dict.fromkeys(top_features["feature"].map(feature_theme).tolist())
     )
@@ -512,32 +557,61 @@ def build_recommendations(top_features: pd.DataFrame) -> list[str]:
     for theme in ordered_themes:
         if theme == "service":
             recommendations.append(
-                "Prioritize proactive retention outreach for customers with repeated customer-service contacts, and route them to specialist resolution teams before renewal windows."
+                (
+                    "Prioritize proactive retention outreach for customers with repeated "
+                    "customer-service contacts, and route them to specialist resolution "
+                    "teams before renewal windows."
+                )
             )
         elif theme == "pricing_usage":
             recommendations.append(
-                "Redesign or personalize plan offers for heavy day-time and international users, especially when current usage patterns imply avoidable bill shock."
+                (
+                    "Redesign or personalize plan offers for heavy day-time and "
+                    "international users, especially when current usage patterns imply "
+                    "avoidable bill shock."
+                )
             )
         elif theme == "engagement":
             recommendations.append(
-                "Use onboarding and adoption campaigns to deepen attachment to sticky features such as voice-mail or related service bundles."
+                (
+                    "Use onboarding and adoption campaigns to deepen attachment to "
+                    "sticky features such as voice-mail or related service bundles."
+                )
             )
         elif theme == "tenure":
             recommendations.append(
-                "Launch an early-life retention play for newer accounts, where loyalty is still forming and switching costs are lower."
+                (
+                    "Launch an early-life retention play for newer accounts, where "
+                    "loyalty is still forming and switching costs are lower."
+                )
             )
         elif theme == "regional":
             recommendations.append(
-                "Investigate region-specific churn pockets to determine whether local competition, coverage, or pricing requires market-level intervention."
+                (
+                    "Investigate region-specific churn pockets to determine whether "
+                    "local competition, coverage, or pricing requires market-level "
+                    "intervention."
+                )
             )
 
         if len(recommendations) == 3:
             break
 
     fallback_recommendations = [
-        "Combine SHAP-based risk flags with CRM triggers so high-risk accounts receive timely save offers instead of generic outbound messaging.",
-        "Monitor whether the dominant SHAP drivers shift after retention campaigns to confirm that operational changes are addressing the real churn mechanisms.",
-        "Feed the top SHAP drivers into marketing segmentation so customer journeys reflect service friction, price sensitivity, and engagement intensity separately.",
+        (
+            "Combine SHAP-based risk flags with CRM triggers so high-risk accounts "
+            "receive timely save offers instead of generic outbound messaging."
+        ),
+        (
+            "Monitor whether the dominant SHAP drivers shift after retention campaigns "
+            "to confirm that operational changes are addressing the real churn "
+            "mechanisms."
+        ),
+        (
+            "Feed the top SHAP drivers into marketing segmentation so customer "
+            "journeys reflect service friction, price sensitivity, and engagement "
+            "intensity separately."
+        ),
     ]
 
     for fallback in fallback_recommendations:
@@ -559,12 +633,14 @@ def build_churn_drivers_markdown(
         humanize_feature_name(feature_name) for feature_name in top_ten["feature"].head(5)
     )
     narrative = (
-        f"SHAP analysis of the Phase 1 best model, **{best_run['model']}** trained with the "
-        f"**{best_run['strategy']}** imbalance strategy, shows that churn risk is driven primarily "
-        f"by a mix of service friction, plan design, and usage intensity. The most influential "
-        f"features were {primary_features}. Across the top-ranked features, customers with signals "
-        f"of repeated support issues, expensive usage patterns, or poor product-plan fit tended to "
-        f"receive positive SHAP contributions that pushed the model toward a churn prediction, while "
+        f"SHAP analysis of the Phase 1 best model, **{best_run['model']}** trained "
+        f"with the **{best_run['strategy']}** imbalance strategy, shows that churn "
+        f"risk is driven primarily by a mix of service friction, plan design, and "
+        f"usage intensity. The most influential features were {primary_features}. "
+        f"Across the top-ranked features, customers with signals of repeated support "
+        f"issues, expensive usage patterns, or poor product-plan fit tended to "
+        f"receive positive SHAP contributions that pushed the model toward a churn "
+        f"prediction, while "
         f"protective engagement signals tended to pull predictions back toward retention."
     )
 
@@ -626,8 +702,9 @@ def build_notebook_payload() -> dict[str, Any]:
             """
             # SHAP Analysis For Telecom Customer Churn
 
-            This notebook reproduces the explainability figures for the best-performing Phase 1 churn model.
-            Each section is written to help non-technical readers understand which customer traits pushed the
+            This notebook reproduces the explainability figures for the best-performing
+            Phase 1 churn model. Each section is written to help non-technical readers
+            understand which customer traits pushed the
             model toward a churn or retention prediction.
             """
         ),
@@ -660,8 +737,9 @@ def build_notebook_payload() -> dict[str, Any]:
             """
             ## Global Feature Importance
 
-            The two plots below answer complementary questions. The summary bar plot shows which variables
-            matter most overall, while the beeswarm plot shows whether the same feature pushes different
+            The two plots below answer complementary questions. The summary bar plot
+            shows which variables matter most overall, while the beeswarm plot shows
+            whether the same feature pushes different
             customers in different directions.
             """
         ),
@@ -678,8 +756,9 @@ def build_notebook_payload() -> dict[str, Any]:
             """
             ## Dependence Plots
 
-            These charts focus on the five most important drivers one at a time. Each point is a customer.
-            The horizontal position shows the feature value, the vertical position shows the SHAP effect on churn risk,
+            These charts focus on the five most important drivers one at a time. Each
+            point is a customer. The horizontal position shows the feature value, the
+            vertical position shows the SHAP effect on churn risk,
             and the color reflects the strongest correlated companion feature.
             """
         ),
@@ -688,34 +767,56 @@ def build_notebook_payload() -> dict[str, Any]:
             dependence_features = top_features["feature"].head(5).tolist()
             for feature_name in dependence_features:
                 display(Markdown(f"### {feature_name.replace('_', ' ').title()}"))
-                display(Image(filename=str(PROJECT_ROOT / "plots" / f"shap_dependence_{slugify(feature_name)}.png")))
+                display(
+                    Image(
+                        filename=str(
+                            PROJECT_ROOT
+                            / "plots"
+                            / f"shap_dependence_{slugify(feature_name)}.png"
+                        )
+                    )
+                )
             """
         ),
         make_markdown_cell(
             """
             ## Local Customer Explanations
 
-            The waterfall plots below explain individual predictions. Features pushing the customer toward
-            churn appear on one side of the baseline prediction, while protective features push the score back down.
+            The waterfall plots below explain individual predictions. Features pushing
+            the customer toward churn appear on one side of the baseline prediction,
+            while protective features push the score back down.
             """
         ),
         make_code_cell(
             """
             for index in range(1, 6):
                 display(Markdown(f"### Sample {index}"))
-                display(Image(filename=str(PROJECT_ROOT / "plots" / f"shap_waterfall_sample_{index}.png")))
+                display(
+                    Image(
+                        filename=str(
+                            PROJECT_ROOT / "plots" / f"shap_waterfall_sample_{index}.png"
+                        )
+                    )
+                )
             """
         ),
         make_markdown_cell(
             """
             ## Business Interpretation
 
-            The final markdown report translates the model findings into operational language for churn-reduction planning.
+            The final markdown report translates the model findings into operational
+            language for churn-reduction planning.
             """
         ),
         make_code_cell(
             """
-            display(Markdown((PROJECT_ROOT / "paper" / "churn_drivers_analysis.md").read_text(encoding="utf-8")))
+            display(
+                Markdown(
+                    (PROJECT_ROOT / "paper" / "churn_drivers_analysis.md").read_text(
+                        encoding="utf-8"
+                    )
+                )
+            )
             """
         ),
     ]
@@ -735,7 +836,9 @@ def build_notebook_payload() -> dict[str, Any]:
                 "name": "python",
                 "nbconvert_exporter": "python",
                 "pygments_lexer": "ipython3",
-                "version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                (
+                    "version"
+                ): f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             },
         },
         "nbformat": 4,

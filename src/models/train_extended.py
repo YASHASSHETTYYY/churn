@@ -108,7 +108,10 @@ def build_preprocessor(x_train: pd.DataFrame) -> ColumnTransformer:
     )
 
 
-def encode_binary_target(y_data: pd.Series, positive_label: str) -> tuple[pd.Series, dict[int, str]]:
+def encode_binary_target(
+    y_data: pd.Series,
+    positive_label: str,
+) -> tuple[pd.Series, dict[int, str]]:
     unique_labels = pd.Index(pd.Series(y_data).dropna().unique()).tolist()
     negative_candidates = [label for label in unique_labels if label != positive_label]
     if len(negative_candidates) != 1:
@@ -453,7 +456,11 @@ def train_model_for_strategy(
             use_smote=False,
             use_class_weight=False,
         )
-        return refit_model, threshold, {"smote": False, "class_weight": False, "threshold_tuned": True}
+        return refit_model, threshold, {
+            "smote": False,
+            "class_weight": False,
+            "threshold_tuned": True,
+        }
 
     raise ValueError(f"Unsupported strategy: {strategy}")
 

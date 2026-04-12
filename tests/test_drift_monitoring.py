@@ -56,7 +56,12 @@ def test_shift_categorical_distribution_reaches_target_proportion():
 
 def test_create_drift_scenario_returns_expected_metadata():
     frame = sample_drift_frame()
-    drifted, metadata = create_drift_scenario(frame, scenario="seasonal", magnitude=0.2, random_state=11)
+    drifted, metadata = create_drift_scenario(
+        frame,
+        scenario="seasonal",
+        magnitude=0.2,
+        random_state=11,
+    )
 
     assert metadata.scenario == "seasonal"
     assert metadata.feature_drifted == "number_customer_service_calls"

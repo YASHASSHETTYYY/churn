@@ -46,7 +46,9 @@ def shift_categorical_distribution(
     if feature not in df.columns:
         raise KeyError(f"Unknown feature: {feature}")
     if pd.api.types.is_numeric_dtype(df[feature]):
-        raise TypeError(f"Feature '{feature}' must be categorical for categorical shift injection.")
+        raise TypeError(
+            f"Feature '{feature}' must be categorical for categorical shift injection."
+        )
 
     if not 0.0 <= new_proportion <= 1.0:
         raise ValueError("new_proportion must be between 0 and 1.")

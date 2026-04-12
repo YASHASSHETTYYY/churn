@@ -8,7 +8,10 @@ import joblib
 import pandas as pd
 
 from src.config import load_config, resolve_path
-from src.evaluation.metrics import compute_binary_classification_metrics, get_positive_class_scores
+from src.evaluation.metrics import (
+    compute_binary_classification_metrics,
+    get_positive_class_scores,
+)
 
 
 def evaluate_saved_model(config_path: str | Path = "params.yaml") -> dict:
@@ -46,4 +49,3 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="params.yaml")
     args = parser.parse_args()
     evaluate_saved_model(config_path=args.config)
-

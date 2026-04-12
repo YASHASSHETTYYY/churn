@@ -9,7 +9,10 @@ import pandas as pd
 import requests
 
 from src.config import resolve_path
-from src.evaluation.metrics import compute_binary_classification_metrics, get_positive_class_scores
+from src.evaluation.metrics import (
+    compute_binary_classification_metrics,
+    get_positive_class_scores,
+)
 from src.models.train_extended import get_model_registry, train_model_for_strategy
 
 
@@ -21,9 +24,18 @@ DATASET_SOURCES = {
     "ibm_telco": {
         "kind": "remote",
         "urls": [
-            "https://raw.githubusercontent.com/SaeidRostami/Customer_Churn/master/WA_Fn-UseC_-Telco-Customer-Churn.csv",
-            "https://huggingface.co/datasets/aai510-group1/customer-churn/raw/main/WA_Fn-UseC_-Telco-Customer-Churn.csv",
-            "https://raw.githubusercontent.com/treselle-systems/customer_churn_analysis/master/WA_Fn-UseC_-Telco-Customer-Churn.csv",
+            (
+                "https://raw.githubusercontent.com/SaeidRostami/Customer_Churn/master/"
+                "WA_Fn-UseC_-Telco-Customer-Churn.csv"
+            ),
+            (
+                "https://huggingface.co/datasets/aai510-group1/customer-churn/raw/main/"
+                "WA_Fn-UseC_-Telco-Customer-Churn.csv"
+            ),
+            (
+                "https://raw.githubusercontent.com/treselle-systems/customer_churn_analysis/"
+                "master/WA_Fn-UseC_-Telco-Customer-Churn.csv"
+            ),
         ],
         "filename": "ibm_telco_customer_churn.csv",
     },
@@ -31,7 +43,10 @@ DATASET_SOURCES = {
         "kind": "remote",
         "urls": [
             "https://raw.githubusercontent.com/nisaamly/Data-Churn/main/Churn_Modelling.csv",
-            "https://raw.githubusercontent.com/sharmaroshan/Churn-Modelling-Dataset/master/Churn_Modelling.csv",
+            (
+                "https://raw.githubusercontent.com/sharmaroshan/Churn-Modelling-Dataset/"
+                "master/Churn_Modelling.csv"
+            ),
         ],
         "filename": "bank_churn_modelling.csv",
     },
@@ -144,7 +159,17 @@ def harmonize_ibm_telco(df: pd.DataFrame) -> pd.DataFrame:
         "StreamingTV",
         "StreamingMovies",
     ]
-    product_count = sum(normalize_yes_no(df[column].replace({"No internet service": "no", "No phone service": "no"})) for column in service_columns)
+    product_count = sum(
+        normalize_yes_no(
+            df[column].replace(
+                {
+                    "No internet service": "no",
+                    "No phone service": "no",
+                }
+            )
+        )
+        for column in service_columns
+    )
     return pd.DataFrame(
         {
             "dataset_name": "ibm_telco",
@@ -152,7 +177,9 @@ def harmonize_ibm_telco(df: pd.DataFrame) -> pd.DataFrame:
             "tenure_months": to_numeric(df["tenure"]),
             "monthly_value": to_numeric(df["MonthlyCharges"]),
             "total_value": total_charges,
-            "support_touches": normalize_yes_no(df["TechSupport"].replace({"No internet service": "no"})).rsub(1),
+            "support_touches": normalize_yes_no(
+                df["TechSupport"].replace({"No internet service": "no"})
+            ).rsub(1),
             "product_count": product_count.astype(float),
             "international_plan_flag": 0.0,
             "contract_group": df["Contract"].astype(str),
@@ -172,13 +199,20 @@ def harmonize_bank_churn(df: pd.DataFrame) -> pd.DataFrame:
             "support_touches": 0.0,
             "product_count": to_numeric(df["NumOfProducts"]),
             "international_plan_flag": 0.0,
-            "contract_group": df["HasCrCard"].astype(str).map({"1": "credit_card_yes", "0": "credit_card_no"}).fillna("credit_card_unknown"),
+            "contract_group": (
+                df["HasCrCard"]
+                .astype(str)
+                .map({"1": "credit_card_yes", "0": "credit_card_no"})
+                .fillna("credit_card_unknown")
+            ),
             "churn": to_numeric(df["Exited"]).fillna(0).astype(int),
         }
     )
 
 
-def load_harmonized_datasets(root_dir: str | Path = "data/external/public") -> dict[str, pd.DataFrame]:
+def load_harmonized_datasets(
+    root_dir: str | Path = "data/external/public",
+) -> dict[str, pd.DataFrame]:
     frames: dict[str, pd.DataFrame] = {}
     for dataset_name in DATASET_SOURCES:
         source_path = download_if_needed(dataset_name, root_dir=root_dir)
@@ -219,7 +253,11 @@ def run_cross_dataset_generalization(
     model_spec = registry[best_model_key]
 
     rows: list[dict[str, Any]] = []
-    feature_columns = [field["name"] for field in COMMON_SCHEMA["fields"] if field["name"] not in {"dataset_name", "churn"}]
+    feature_columns = [
+        field["name"]
+        for field in COMMON_SCHEMA["fields"]
+        if field["name"] not in {"dataset_name", "churn"}
+    ]
     for train_name, train_df in datasets.items():
         x_train = train_df[feature_columns]
         y_train = train_df["churn"].astype(int)
