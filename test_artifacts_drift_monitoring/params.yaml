@@ -1,3 +1,3 @@
 drift_monitoring:
-  report_html: C:\Users\hp\churnpredicationresearchpaper\churn\test_artifacts_drift_monitoring\reports\drift_report.html
-  summary_json: C:\Users\hp\churnpredicationresearchpaper\churn\test_artifacts_drift_monitoring\reports\drift_report.json
+  report_html: C:\Users\pritish\OneDrive\Desktop\churnpredictionResearch\test_artifacts_drift_monitoring\reports\drift_report.html
+  summary_json: C:\Users\pritish\OneDrive\Desktop\churnpredictionResearch\test_artifacts_drift_monitoring\reports\drift_report.json
