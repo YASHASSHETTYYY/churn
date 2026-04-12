@@ -1,0 +1,9 @@
+name: churnpredictionResearch
+
+entry_points:
+  train:
+    parameters:
+      config: {type: str, default: "params.yaml"}
+      n_trials: {type: int, default: 50}
+    command: "python -m src.models.train_model --config {config} --n-trials {n_trials}"
+

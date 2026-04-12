@@ -20,7 +20,10 @@ system:
 - validated input data and reproducible training steps
 - preprocessing-aware Random Forest training with hyperparameter search
 - FastAPI prediction service with batch scoring
+- async API endpoints with rate limiting
 - SHAP explanations for individual predictions
+- MLflow experiment tracking with artifact logging
+- DVC-managed data and pipeline stages
 - drift reporting for production monitoring
 - Prometheus metrics and Grafana dashboard assets
 - Docker-based local deployment
@@ -115,10 +118,11 @@ flowchart LR
 .
 |-- .github/workflows/ci-cd.yaml      # Staged CI/CD pipeline
 |-- dashboard/streamlit_app.py        # Interactive prediction dashboard
+|-- app/main.py                       # Async FastAPI application entrypoint
 |-- monitoring/                       # Prometheus and Grafana configuration
 |-- reports/                          # Generated reports and training outputs
 |-- src/
-|   |-- api/app.py                    # FastAPI serving layer
+|   |-- api/app.py                    # Compatibility import for the FastAPI app
 |   |-- config.py                     # Shared config/path utilities
 |   |-- data/
 |   |   |-- load_data.py              # Raw data loading
@@ -173,6 +177,8 @@ The API supports:
 - batch predictions
 - SHAP-based explanations
 - Prometheus metrics for monitoring
+- async request handlers
+- rate limiting on `POST /predict` at `100 requests/minute/IP`
 
 ### 3. Drift Monitoring
 
@@ -200,8 +206,10 @@ The API exports metrics designed for operational dashboards:
 
 - `prediction_requests_total`
 - `prediction_errors_total`
+- `prediction_confidence_mean`
 - `model_latency_seconds`
 - `model_error_rate`
+- `model_drift_score`
 
 Prometheus scrapes the metrics endpoint and Grafana is preconfigured with a
 basic monitoring dashboard.
@@ -274,6 +282,15 @@ python src\data\split_data.py --config params.yaml
 python -m src.models.train_model --config params.yaml --n-trials 50
 ```
 
+### Step 3a. Track Training With MLflow
+
+```powershell
+mlflow run . -e train -P config=params.yaml -P n_trials=50 --env-manager=local
+mlflow ui --backend-store-uri .\mlruns --port 5000
+```
+
+Open `http://127.0.0.1:5000` to inspect parameters, metrics, model artifacts, and the SHAP plot artifact.
+
 ### Step 4. Generate Drift Report
 
 ```powershell
@@ -283,7 +300,7 @@ python src\monitoring\drift_report.py --config params.yaml
 ## Run The API
 
 ```powershell
-python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Open:
@@ -386,7 +403,7 @@ Available services:
 Run linting:
 
 ```powershell
-python -m flake8 --jobs 1 src tests dashboard app.py
+python -m flake8 --jobs 1 src tests dashboard app
 ```
 
 Run tests:
@@ -394,6 +411,24 @@ Run tests:
 ```powershell
 python -m pytest -q tests
 ```
+
+Run the async API integration suite:
+
+```powershell
+python -m pytest -q tests/integration/test_api.py
+```
+
+## DVC Pipeline
+
+Track the versioned dataset outputs and reproduce the pipeline with:
+
+```powershell
+dvc add data/raw/telecom_churn.csv
+dvc add data/processed
+dvc repro
+```
+
+The configured stages are `preprocess -> train -> evaluate -> shap`.
 
 ## GitHub Actions Workflow
 

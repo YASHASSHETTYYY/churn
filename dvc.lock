@@ -71,3 +71,132 @@ stages:
       hash: md5
       md5: f28b3bff3b5993416a41ca6b659d7b4a
       size: 1563540
+  preprocess:
+    cmd: .venv\Scripts\python.exe src/data/preprocess_data.py --config 
+      params.yaml
+    deps:
+    - path: data/external/train.csv
+      hash: md5
+      md5: 4765c4960be9cdbe249e97eda1b46c20
+      size: 391872
+    - path: src/data/load_data.py
+      hash: md5
+      md5: 54447ae50d08277827bb3df29e7234d1
+      size: 1313
+    - path: src/data/preprocess_data.py
+      hash: md5
+      md5: 7c32ac3d6290d02f67b34b8eff8a2356
+      size: 1534
+    - path: src/data/split_data.py
+      hash: md5
+      md5: d1694b11becf65470beb192acf9a2cb8
+      size: 1810
+    params:
+      params.yaml:
+        raw_data_config.random_state: 111
+        raw_data_config.raw_data_csv: data/raw/telecom_churn.csv
+        raw_data_config.train_test_split_ratio: 0.2
+    outs:
+    - path: reports/preprocess_summary.json
+      hash: md5
+      md5: e7d0868190fefbe34a2967cb428c0f54
+      size: 411
+  train:
+    cmd: .venv\Scripts\python.exe src/models/train_model.py --config params.yaml
+    deps:
+    - path: data/processed/churn_test.csv
+      hash: md5
+      md5: 4deba8b5dd7349f8c52d1cf69f18be7a
+      size: 78649
+    - path: data/processed/churn_train.csv
+      hash: md5
+      md5: ce8e22075b2c76045ed41d564821b3b4
+      size: 313561
+    - path: params.yaml
+      hash: md5
+      md5: c26fc40908a62fcef50dcc1187030e73
+      size: 1640
+    - path: src/explainability/generate_shap_artifacts.py
+      hash: md5
+      md5: 350a73e9cb6f9b820790deedca4d4b44
+      size: 5320
+    - path: src/models/train_model.py
+      hash: md5
+      md5: af96e69dca731c1431bcdd69080cf523
+      size: 12319
+    params:
+      params.yaml:
+        random_forest.max_depth:
+        - 4
+        - 24
+        random_forest.max_features:
+        - sqrt
+        - log2
+        - 
+        random_forest.min_samples_leaf:
+        - 1
+        - 10
+        random_forest.min_samples_split:
+        - 2
+        - 20
+        random_forest.n_estimators:
+        - 80
+        - 240
+        training.cv_folds: 3
+        training.n_jobs: 1
+        training.n_trials: 50
+    outs:
+    - path: models/churn_model.joblib
+      hash: md5
+      md5: 0b2d6aa54b655273bc717864c71a6126
+      size: 2073773
+    - path: reports/best_params.json
+      hash: md5
+      md5: 7a21f798d0b12c615f8664c5ddc8a68f
+      size: 124
+  evaluate:
+    cmd: .venv\Scripts\python.exe src/models/evaluate_model.py --config 
+      params.yaml
+    deps:
+    - path: data/processed/churn_test.csv
+      hash: md5
+      md5: 4deba8b5dd7349f8c52d1cf69f18be7a
+      size: 78649
+    - path: models/churn_model.joblib
+      hash: md5
+      md5: 0b2d6aa54b655273bc717864c71a6126
+      size: 2073773
+    - path: src/evaluation/metrics.py
+      hash: md5
+      md5: 78985087edf25a34ef0ca26f511353ec
+      size: 5847
+    - path: src/models/evaluate_model.py
+      hash: md5
+      md5: 6b26eb90a6cffc21d9acd71e3911e8c8
+      size: 1671
+    outs:
+    - path: reports/model_metrics.json
+      hash: md5
+      md5: 23459c2e7a9143aa2e2da7a39862103d
+      size: 617
+  shap:
+    cmd: .venv\Scripts\python.exe src/explainability/generate_shap_artifacts.py 
+      --config params.yaml
+    deps:
+    - path: data/processed/churn_test.csv
+      hash: md5
+      md5: 4deba8b5dd7349f8c52d1cf69f18be7a
+      size: 78649
+    - path: models/churn_model.joblib
+      hash: md5
+      md5: 0b2d6aa54b655273bc717864c71a6126
+      size: 2073773
+    - path: src/explainability/generate_shap_artifacts.py
+      hash: md5
+      md5: 350a73e9cb6f9b820790deedca4d4b44
+      size: 5320
+    outs:
+    - path: plots/shap_summary_train.png
+      hash: md5
+      md5: d5bd144c316d4fb9c38cb6ac4e482800
+      size: 201565

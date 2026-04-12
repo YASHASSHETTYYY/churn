@@ -51,6 +51,11 @@ class ChurnPredictor:
             "positive_label",
             raw_config.get("positive_class", "yes"),
         )
+        self.model_version = str(
+            self.metadata.get("model_version")
+            or self.metadata.get("mlflow_run_id")
+            or self.artifact_path.stem
+        )
         self._explainer = None
 
     def _to_frame(self, records: Any) -> pd.DataFrame:

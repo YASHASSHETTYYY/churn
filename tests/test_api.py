@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import app as api_module
+from app import main as api_module
 from src.models.predict import ChurnPredictor
 from src.models.train_model import build_training_pipeline
 
@@ -124,6 +124,12 @@ def client(predictor):
     api_module._predictor = predictor
     api_module._request_count = 0
     api_module._error_count = 0
+    api_module._confidence_sum = 0.0
+    api_module._confidence_observation_count = 0
+    if hasattr(api_module.limiter, "reset"):
+        api_module.limiter.reset()
+    elif hasattr(api_module.limiter, "_storage") and hasattr(api_module.limiter._storage, "reset"):
+        api_module.limiter._storage.reset()
     return TestClient(api_module.app)
 
 

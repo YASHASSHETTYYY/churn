@@ -1,37 +1,54 @@
 stages:
-  raw_dataset_creation:
-    cmd: python src/data/load_data.py --config=params.yaml
+  preprocess:
+    cmd: .venv\Scripts\python.exe src/data/preprocess_data.py --config params.yaml
     deps:
     - src/data/load_data.py
-    - data/external/train.csv
-    outs:
-    - data/raw/train.csv
-  
-  split_data:
-    cmd: python src/data/split_data.py --config=params.yaml
-    deps:
+    - src/data/preprocess_data.py
     - src/data/split_data.py
-    - data/raw/train.csv
+    - data/external/train.csv
+    params:
+    - raw_data_config.raw_data_csv
+    - raw_data_config.train_test_split_ratio
+    - raw_data_config.random_state
     outs:
-    - data/processed/churn_train.csv
-    - data/processed/churn_test.csv
+    - reports/preprocess_summary.json
 
-  model_train:
-    cmd: python src/models/train_model.py --config=params.yaml
+  train:
+    cmd: .venv\Scripts\python.exe src/models/train_model.py --config params.yaml
     deps:
     - data/processed/churn_train.csv
     - data/processed/churn_test.csv
     - src/models/train_model.py
+    - src/explainability/generate_shap_artifacts.py
+    - params.yaml
     params:
-    - random_forest.max_depth
+    - training.n_trials
+    - training.cv_folds
+    - training.n_jobs
     - random_forest.n_estimators
-
-  log_production_model:
-    cmd: python src/models/production_model_selection.py --config=params.yaml
-    deps:
-    - src/models/production_model_selection.py
-    params:
     - random_forest.max_depth
-    - random_forest.n_estimators
+    - random_forest.min_samples_split
+    - random_forest.min_samples_leaf
+    - random_forest.max_features
     outs:
-    - webapp/model_webapp_dir/model.joblib
+    - models/churn_model.joblib
+    - reports/best_params.json
+
+  evaluate:
+    cmd: .venv\Scripts\python.exe src/models/evaluate_model.py --config params.yaml
+    deps:
+    - data/processed/churn_test.csv
+    - models/churn_model.joblib
+    - src/models/evaluate_model.py
+    - src/evaluation/metrics.py
+    outs:
+    - reports/model_metrics.json
+
+  shap:
+    cmd: .venv\Scripts\python.exe src/explainability/generate_shap_artifacts.py --config params.yaml
+    deps:
+    - data/processed/churn_test.csv
+    - models/churn_model.joblib
+    - src/explainability/generate_shap_artifacts.py
+    outs:
+    - plots/shap_summary_train.png

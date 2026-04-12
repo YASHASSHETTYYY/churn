@@ -1,0 +1,8 @@
+{
+  "raw_rows": 4250,
+  "train_rows": 3400,
+  "test_rows": 850,
+  "raw_path": "C:\\Users\\pritish\\OneDrive\\Desktop\\churnpredictionResearch\\data\\raw\\telecom_churn.csv",
+  "train_path": "C:\\Users\\pritish\\OneDrive\\Desktop\\churnpredictionResearch\\data\\processed\\churn_train.csv",
+  "test_path": "C:\\Users\\pritish\\OneDrive\\Desktop\\churnpredictionResearch\\data\\processed\\churn_test.csv"
+}

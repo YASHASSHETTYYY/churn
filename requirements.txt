@@ -4,6 +4,7 @@
 # quality and testing
 flake8
 pytest
+pytest-asyncio
 httpx
 
 # data and modeling
@@ -19,11 +20,13 @@ pyyaml
 optuna
 shap
 evidently
+fairlearn
 
 # serving and dashboards
 fastapi
 uvicorn[standard]
 prometheus-client
+slowapi
 streamlit
 
 # existing project dependencies

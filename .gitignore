@@ -79,6 +79,16 @@ target/
 # /data/
 /data/raw/
 /data/processed/
+!data/raw/
+/data/raw/*
+!data/raw/*.dvc
+!data/*.dvc
+/models/churn_model.joblib
+/reports/best_params.json
+/reports/model_metrics.json
+/plots/shap_summary_train.png
+/mlruns/
+__pycache__/
 /webapp/model_webapp_dir/model.joblib
 
 # Mac OS-specific storage files

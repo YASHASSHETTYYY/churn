@@ -1,0 +1,48 @@
+{
+  "description": "Common schema for cross-dataset churn generalization experiments.",
+  "target": "churn",
+  "fields": [
+    {
+      "name": "dataset_name",
+      "type": "string",
+      "role": "metadata"
+    },
+    {
+      "name": "geography_group",
+      "type": "string"
+    },
+    {
+      "name": "tenure_months",
+      "type": "float"
+    },
+    {
+      "name": "monthly_value",
+      "type": "float"
+    },
+    {
+      "name": "total_value",
+      "type": "float"
+    },
+    {
+      "name": "support_touches",
+      "type": "float"
+    },
+    {
+      "name": "product_count",
+      "type": "float"
+    },
+    {
+      "name": "international_plan_flag",
+      "type": "float"
+    },
+    {
+      "name": "contract_group",
+      "type": "string"
+    },
+    {
+      "name": "churn",
+      "type": "integer",
+      "role": "target"
+    }
+  ]
+}
