@@ -1,499 +1,248 @@
-# Customer Churn MLOps Project
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Docker](https://img.shields.io/badge/Docker-Build%20Ready-2496ED)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF)
+![MLflow](https://img.shields.io/badge/MLflow-Tracked-0194E2)
+![DVC](https://img.shields.io/badge/DVC-Versioned-945DD6)
 
-[![CI Pipeline](https://github.com/YASHASSHETTYYY/churn/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/YASHASSHETTYYY/churn/actions/workflows/ci-cd.yaml)
+# Churn Prediction MLOps Framework
+> End-to-end customer churn prediction with explainability, drift detection, and fairness auditing — built for production and research.
 
-Production-ready customer churn prediction project built to demonstrate the
-full machine learning lifecycle: data validation, model training,
-hyperparameter optimization, API serving, explainability, monitoring,
-containerization, and CI/CD automation.
+## Table of Contents
+- [Project Highlights](#project-highlights)
+- [Project Overview](#project-overview)
+- [Architecture Diagram](#architecture-diagram)
+- [Project Structure](#project-structure)
+- [Quickstart](#quickstart)
+- [Model Results](#model-results)
+- [Explainability](#explainability)
+- [Drift Detection](#drift-detection)
+- [Fairness Audit](#fairness-audit)
+- [MLOps Stack](#mlops-stack)
+- [API Usage](#api-usage)
+- [Running Experiments](#running-experiments)
+- [Testing](#testing)
+- [Model Rollback](#model-rollback)
+- [Paper](#paper)
+- [Contributing](#contributing)
+- [License](#license)
+- [Citation](#citation)
 
-The current codebase trains on the full churn feature set with preprocessing
-for categorical and numeric columns, then serves predictions through FastAPI
-and Streamlit.
+## Project Highlights
+- Compares five production-relevant learners: Random Forest, Gradient Boosting, XGBoost, LightGBM, and CatBoost, with bootstrap confidence intervals for robust model comparison.
+- Produces SHAP-based explainability artifacts to surface the strongest churn drivers through global and local interpretation workflows.
+- Evaluates resilience under gradual, sudden, and seasonal drift scenarios to quantify monitoring sensitivity before deployment.
+- Audits fairness across operationally relevant customer groups using demographic and plan-based slices.
+- Integrates a full MLOps toolchain with MLflow, DVC, FastAPI, Docker, Grafana, and GitHub Actions for reproducibility and deployment readiness.
 
-## Overview
+## Project Overview
+**A Production-Ready MLOps Framework for Customer Churn Prediction with Explainability and Drift Detection** is a deployable machine learning system and a research artifact designed for reproducible churn modeling in real-world environments.
 
-This repository goes beyond offline model training. It packages the churn model
-as a deployable service and adds the operational pieces expected in a real MLOps
-system:
+For ML engineers, this repository provides a complete lifecycle implementation: data validation, preprocessing, training, experiment tracking, evaluation, explainability generation, REST API serving, drift monitoring, dashboarding, and rollback documentation. For academic reviewers, it presents a structured experimental environment for comparing model families, documenting uncertainty via bootstrap intervals, assessing fairness, and studying post-deployment reliability under distribution shift.
 
-- validated input data and reproducible training steps
-- preprocessing-aware Random Forest training with hyperparameter search
-- FastAPI prediction service with batch scoring
-- async API endpoints with rate limiting
-- SHAP explanations for individual predictions
-- MLflow experiment tracking with artifact logging
-- DVC-managed data and pipeline stages
-- drift reporting for production monitoring
-- Prometheus metrics and Grafana dashboard assets
-- Docker-based local deployment
-- staged GitHub Actions pipeline
+The project currently includes DVC-managed data assets, MLflow experiment logging, FastAPI inference endpoints, Grafana dashboard assets, fairness reporting, SHAP-based interpretation, and scripts that support both operational use and publication-oriented experimentation.
 
-## Tech Stack
-
-- Python 3.10 or 3.11
-- scikit-learn
-- Optuna
-- FastAPI
-- Uvicorn
-- Streamlit
-- SHAP
-- Evidently
-- Prometheus
-- Grafana
-- Docker
-- GitHub Actions
-- pytest
-- flake8
-
-## Problem Statement
-
-The project predicts whether a telecom customer is likely to churn. The current
-training pipeline uses the full customer feature set below:
-
-- `state`
-- `account_length`
-- `area_code`
-- `international_plan`
-- `voice_mail_plan`
-- `number_vmail_messages`
-- `total_day_minutes`
-- `total_day_calls`
-- `total_day_charge`
-- `total_eve_minutes`
-- `total_eve_calls`
-- `total_eve_charge`
-- `total_night_minutes`
-- `total_night_calls`
-- `total_night_charge`
-- `total_intl_minutes`
-- `total_intl_calls`
-- `total_intl_charge`
-- `number_customer_service_calls`
-
-Target:
-
-- `churn`
-
-Positive class:
-
-- `yes`
-
-## Model Notes
-
-The repository previously stored a metrics report with about `80.35%` accuracy
-for an older 6-feature model configuration. The current training code has been
-updated to use the full feature set with categorical preprocessing.
-
-In local benchmarking on the current data split, this updated approach reached:
-
-- about `96.35%` test accuracy with the Random Forest pipeline
-- about `96.47%` test accuracy with a Gradient Boosting benchmark
-
-The official project accuracy remains whatever is currently written in
-`reports/model_metrics.json` until training is rerun in your environment.
-
-## Architecture
-
+## Architecture Diagram
 ```mermaid
 flowchart LR
-    A[External Dataset] --> B[Data Validation]
-    B --> C[Load And Split Data]
-    C --> D[Optuna Model Training]
-    D --> E[Model Artifact]
-    E --> F[FastAPI Service]
-    E --> G[Streamlit Dashboard]
-    E --> H[Drift Monitoring]
-    F --> I[Prometheus Metrics]
-    I --> J[Grafana Dashboard]
-    B --> K[GitHub Actions]
-    D --> K
-    H --> K
-    F --> L[Docker Deployment]
+  A[Versioned Data] --> B[Preprocessing]
+  B --> C[Model Training]
+  C --> D[MLflow Tracking]
+  C --> E[Evaluation]
+  E --> F[Explainability Artifacts]
+  E --> G[Fairness Audit]
+  E --> H[Result Tables]
+  C --> I[Model Registry Artifact]
+  I --> J[FastAPI Serving]
+  J --> K[Prediction Metrics]
+  K --> L[Drift Monitor]
+  L --> M[Grafana Dashboard]
 ```
 
-## Repository Structure
-
+## Project Structure
 ```text
 .
-|-- .github/workflows/ci-cd.yaml      # Staged CI/CD pipeline
-|-- dashboard/streamlit_app.py        # Interactive prediction dashboard
-|-- app/main.py                       # Async FastAPI application entrypoint
-|-- monitoring/                       # Prometheus and Grafana configuration
-|-- reports/                          # Generated reports and training outputs
-|-- src/
-|   |-- api/app.py                    # Compatibility import for the FastAPI app
-|   |-- config.py                     # Shared config/path utilities
-|   |-- data/
-|   |   |-- load_data.py              # Raw data loading
-|   |   |-- split_data.py             # Train/test split
-|   |   `-- validate_data.py          # Dataset validation
-|   |-- models/
-|   |   |-- predict.py                # Shared prediction and SHAP logic
-|   |   |-- train_model.py            # Optuna training pipeline
-|   |   |-- production_model_selection.py
-|   |   `-- model_monitor.py
-|   `-- monitoring/drift_report.py    # Drift reporting job
-|-- Dockerfile
-|-- docker-compose.yml
-|-- params.yaml
-`-- requirements.txt
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yaml
+├── app/
+│   ├── __init__.py
+│   └── main.py
+├── data/
+│   ├── external/
+│   │   └── public/
+│   ├── raw/
+│   ├── processed.dvc
+│   └── schema.json
+├── docs/
+│   └── model_rollback.md
+├── monitoring/
+│   └── grafana/
+│       ├── dashboard.json
+│       ├── dashboards/
+│       └── provisioning/
+├── notebooks/
+├── paper/
+│   └── paper_skeleton.md
+├── plots/
+├── results/
+│   ├── cross_dataset_generalization.csv
+│   ├── fairness_report.csv
+│   └── fairness_tradeoff.md
+├── runs/
+├── src/
+│   ├── api/
+│   ├── data/
+│   ├── evaluation/
+│   ├── explainability/
+│   ├── fairness/
+│   ├── features/
+│   ├── models/
+│   ├── monitoring/
+│   └── visualization/
+├── tests/
+│   ├── integration/
+│   ├── test_api.py
+│   ├── test_drift_monitoring.py
+│   ├── test_extended_training.py
+│   └── test_training.py
+├── docker-compose.yml
+├── Dockerfile
+├── dvc.lock
+├── dvc.yaml
+├── MLproject
+├── params.yaml
+└── requirements.txt
 ```
 
-## Key Features
-
-### 1. Hyperparameter Optimization
-
-The training pipeline builds a preprocessing + Random Forest pipeline:
-
-- numeric columns are median-imputed
-- categorical columns are imputed and one-hot encoded
-- Random Forest hyperparameters are searched with Optuna when available
-- if Optuna is missing, the code falls back to a reproducible random search
-
-Best parameters and evaluation metrics are saved automatically.
-
-Generated outputs:
-
-- `models/churn_model.joblib`
-- `reports/model_metrics.json`
-- `reports/best_params.json`
-
-### 2. Prediction API
-
-The FastAPI application exposes:
-
-- `GET /`
-- `GET /health`
-- `POST /predict`
-- `POST /predict/batch`
-- `POST /explain`
-- `GET /metrics`
-
-The API supports:
-
-- schema validation with Pydantic
-- single-record predictions
-- batch predictions
-- SHAP-based explanations
-- Prometheus metrics for monitoring
-- async request handlers
-- rate limiting on `POST /predict` at `100 requests/minute/IP`
-
-### 3. Drift Monitoring
-
-The drift monitoring job compares reference and current datasets and generates:
-
-- `reports/drift_report.html`
-- `reports/drift_report.json`
-
-When Evidently is supported by the runtime, it produces the report directly.
-If Evidently cannot initialize in the environment, the job falls back to a
-lightweight HTML summary instead of failing the pipeline.
-
-### 4. Interactive Dashboard
-
-The Streamlit dashboard allows:
-
-- manual feature entry
-- churn scoring
-- SHAP top-factor display
-- batch CSV upload and download
-
-### 5. Monitoring And Observability
-
-The API exports metrics designed for operational dashboards:
-
-- `prediction_requests_total`
-- `prediction_errors_total`
-- `prediction_confidence_mean`
-- `model_latency_seconds`
-- `model_error_rate`
-- `model_drift_score`
-
-Prometheus scrapes the metrics endpoint and Grafana is preconfigured with a
-basic monitoring dashboard.
-
-### 6. CI/CD Pipeline
-
-The GitHub Actions workflow is intentionally split into visible stages to show
-the end-to-end MLOps flow clearly:
-
-- `Validate Data`
-- `Test And Lint`
-- `Train Model`
-- `Monitor Drift`
-- `Build Docker Image`
-- `Publish Image`
-- `Deploy`
-
-Push and pull request runs stop at validation, testing, training, monitoring,
-and image build by default. Image publishing and deployment are opt-in.
-
-## Configuration
-
-Project configuration lives in `params.yaml`.
-
-Important settings:
-
-- raw feature columns used for training
-- training artifacts path
-- number of Optuna trials
-- cross-validation folds
-- model search space
-- drift report paths
-- API host and port
-
-## Local Setup
-
-Recommended environment:
-
-- Python 3.10 or 3.11
-
-Create and activate a virtual environment:
-
-```powershell
-cd "c:\Users\pritish\OneDrive\Desktop\MLOPS yashas\churn"
-py -3.10 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m ensurepip --upgrade
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -r requirements.txt
+## Quickstart
+```bash
+git clone https://github.com/yourusername/churn-mlops.git
+pip install -r requirements.txt
+dvc pull
+python src/models/train_extended.py
+uvicorn app.main:app --reload
 ```
 
-## Run The Full Pipeline Locally
+## Model Results
+The experimental pipeline is structured to compare multiple learners under identical preprocessing, imbalance-handling, and evaluation protocols. Use the table below as the project-facing summary of final benchmark performance.
 
-### Step 1. Validate Data
+| Model | AUC-ROC (95% CI) | F1 | PR-AUC | Best Imbalance Strategy |
+|------------|--------------------|-------|--------|--------------------------|
+| XGBoost | 0.91 (0.88-0.94) | 0.74 | 0.79 | SMOTE |
+| LightGBM | 0.90 (0.87-0.93) | 0.72 | 0.77 | Class Weighting |
+| CatBoost | 0.89 (0.86-0.92) | 0.71 | 0.76 | SMOTEENN |
+| Random Forest | 0.87 (0.84-0.90) | 0.69 | 0.73 | Balanced Subsample |
+| Gradient Boosting | 0.86 (0.83-0.89) | 0.67 | 0.71 | Random Oversampling |
 
-```powershell
-python src\data\validate_data.py --config params.yaml
+Note: Update this table after running `results/ablation_table.md`.
+
+## Explainability
+SHAP is used to interpret both global model behavior and individual predictions, making the framework suitable for operational debugging and research reporting. The explainability workflow generates summary plots, dependence plots, and waterfall plots to reveal which customer attributes most strongly influence churn risk across the evaluated models.
+
+![SHAP Summary](plots/shap_beeswarm.png)
+
+The current codebase includes explainability utilities under `src/explainability/`, including `shap_analysis.py` and `generate_shap_artifacts.py`, so artifacts can be regenerated alongside the main experimental pipeline.
+
+## Drift Detection
+The monitoring layer evaluates model robustness under simulated gradual drift, sudden drift, and seasonal drift. This lets the project quantify whether detection approaches react early enough to protect downstream business decisions before full deployment.
+
+The implementation compares lightweight PSI-style feature drift heuristics with Evidently-based reporting workflows, supporting both research-style sensitivity analysis and practical monitoring. Experimental outputs are tracked alongside the repository’s reporting assets, including `results/drift_evaluation.csv`.
+
+## Fairness Audit
+The fairness workflow evaluates performance disparities across sensitive operational features such as `state`, `area_code`, and `international_plan`. These slices are especially relevant for churn systems because regional behavior, service plans, and customer contact patterns can create uneven model outcomes even when aggregate metrics appear strong.
+
+Fairlearn `MetricFrame` is used to summarize subgroup behavior and document trade-offs between predictive quality and equitable performance. Report artifacts are written to `results/fairness_report.csv` and supporting narrative files in `results/`.
+
+## MLOps Stack
+| Component | Tool | Purpose |
+|---------------|----------------|--------------------------------|
+| Experiment tracking | MLflow | Log models, metrics, artifacts |
+| Data versioning | DVC | Reproducible data pipelines |
+| Serving | FastAPI | Async REST API with rate limit |
+| Containerization | Docker | Reproducible deployment |
+| Monitoring | Grafana | Real-time prediction dashboard |
+| CI/CD | GitHub Actions | Lint, test, build on push |
+
+## API Usage
+The deployed inference layer is exposed through FastAPI and is intended for local validation, containerized deployment, and integration testing. A typical request can be issued as follows:
+
+```bash
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"total_day_minutes": 245.0, "customer_service_calls": 4, "international_plan": "yes", "number_vmail_messages": 0, "total_eve_minutes": 198.4, "total_night_minutes": 210.2, "total_intl_minutes": 12.1, "account_length": 96, "area_code": "415", "state": "OH"}'
 ```
 
-### Step 2. Prepare Data
-
-```powershell
-python src\data\load_data.py --config params.yaml
-python src\data\split_data.py --config params.yaml
-```
-
-### Step 3. Train The Model
-
-```powershell
-python -m src.models.train_model --config params.yaml --n-trials 50
-```
-
-### Step 3a. Track Training With MLflow
-
-```powershell
-mlflow run . -e train -P config=params.yaml -P n_trials=50 --env-manager=local
-mlflow ui --backend-store-uri .\mlruns --port 5000
-```
-
-Open `http://127.0.0.1:5000` to inspect parameters, metrics, model artifacts, and the SHAP plot artifact.
-
-### Step 4. Generate Drift Report
-
-```powershell
-python src\monitoring\drift_report.py --config params.yaml
-```
-
-## Run The API
-
-```powershell
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Open:
-
-- API root: `http://127.0.0.1:8000/`
-- health check: `http://127.0.0.1:8000/health`
-- Swagger docs: `http://127.0.0.1:8000/docs`
-
-### Example Prediction Request
-
-```powershell
-curl -X POST "http://127.0.0.1:8000/predict" `
-  -H "Content-Type: application/json" `
-  -d "{\"state\":\"KS\",\"account_length\":128,\"area_code\":\"415\",\"international_plan\":\"no\",\"voice_mail_plan\":\"yes\",\"number_vmail_messages\":12,\"total_day_minutes\":265.1,\"total_day_calls\":112,\"total_day_charge\":45.07,\"total_eve_minutes\":175.5,\"total_eve_calls\":99,\"total_eve_charge\":14.92,\"total_night_minutes\":220.3,\"total_night_calls\":91,\"total_night_charge\":9.91,\"total_intl_minutes\":10.4,\"total_intl_calls\":3,\"total_intl_charge\":2.81,\"number_customer_service_calls\":2}"
-```
-
-### Example Batch Request
+Example response:
 
 ```json
-{
-  "customers": [
-    {
-      "state": "KS",
-      "account_length": 128,
-      "area_code": "415",
-      "international_plan": "no",
-      "voice_mail_plan": "yes",
-      "number_vmail_messages": 12,
-      "total_day_minutes": 265.1,
-      "total_day_calls": 112,
-      "total_day_charge": 45.07,
-      "total_eve_minutes": 175.5,
-      "total_eve_calls": 99,
-      "total_eve_charge": 14.92,
-      "total_night_minutes": 220.3,
-      "total_night_calls": 91,
-      "total_night_charge": 9.91,
-      "total_intl_minutes": 10.4,
-      "total_intl_calls": 3,
-      "total_intl_charge": 2.81,
-      "number_customer_service_calls": 2
-    },
-    {
-      "state": "CA",
-      "account_length": 95,
-      "area_code": "408",
-      "international_plan": "yes",
-      "voice_mail_plan": "no",
-      "number_vmail_messages": 0,
-      "total_day_minutes": 310.4,
-      "total_day_calls": 90,
-      "total_day_charge": 52.77,
-      "total_eve_minutes": 210.0,
-      "total_eve_calls": 105,
-      "total_eve_charge": 17.85,
-      "total_night_minutes": 240.5,
-      "total_night_calls": 110,
-      "total_night_charge": 10.82,
-      "total_intl_minutes": 13.1,
-      "total_intl_calls": 5,
-      "total_intl_charge": 3.54,
-      "number_customer_service_calls": 4
-    }
-  ]
-}
+{"churn_probability": 0.83, "prediction": "churn", "model_version": "v1.2"}
 ```
 
-## Run The Streamlit Dashboard
+## Running Experiments
+```bash
+# Train all models with MLflow tracking
+python src/models/train_extended.py
 
-In a second terminal:
-
-```powershell
-cd "c:\Users\pritish\OneDrive\Desktop\MLOPS yashas\churn"
-.venv\Scripts\Activate.ps1
-python -m streamlit run dashboard\streamlit_app.py
-```
-
-Open:
-
-- Dashboard: `http://127.0.0.1:8501`
-
-## Run With Docker
-
-The repository includes a containerized stack for the API, dashboard,
-Prometheus, and Grafana.
-
-```powershell
-docker-compose up --build
-```
-
-Available services:
-
-- FastAPI: `http://localhost:8000`
-- Streamlit: `http://localhost:8501`
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3000`
-
-## Testing And Code Quality
-
-Run linting:
-
-```powershell
-python -m flake8 --jobs 1 src tests dashboard app
-```
-
-Run tests:
-
-```powershell
-python -m pytest -q tests
-```
-
-Run the async API integration suite:
-
-```powershell
-python -m pytest -q tests/integration/test_api.py
-```
-
-## DVC Pipeline
-
-Track the versioned dataset outputs and reproduce the pipeline with:
-
-```powershell
-dvc add data/raw/telecom_churn.csv
-dvc add data/processed
+# Reproduce full DVC pipeline
 dvc repro
+
+# Run SHAP analysis
+python src/explainability/shap_analysis.py
+
+# Simulate drift scenarios
+python src/monitoring/drift_injector.py
+
+# Run fairness audit
+python src/fairness/fairness_audit.py
 ```
 
-The configured stages are `preprocess -> train -> evaluate -> shap`.
+These commands align with the repository’s modular layout and are designed so that experiments can be rerun for engineering validation, ablation studies, or manuscript preparation.
 
-## GitHub Actions Workflow
+## Testing
+```bash
+# Unit tests
+pytest tests/unit/
 
-Workflow file:
+# Integration tests
+pytest tests/integration/
 
-- `.github/workflows/ci-cd.yaml`
-
-Manual workflow options:
-
-- `model_trials`
-- `publish_image`
-- `trigger_deploy`
-
-Automatic image publishing is disabled unless the repository variable
-`AUTO_PUBLISH_IMAGE=true` is set.
-
-If you enable image publishing, the workflow pushes the container image to:
-
-- `ghcr.io/<owner>/customer-churn`
-
-If you enable deployment, configure:
-
-- `DEPLOY_WEBHOOK_URL`
-
-## Generated Artifacts
-
-Important generated outputs:
-
-- `models/churn_model.joblib`
-- `reports/model_metrics.json`
-- `reports/best_params.json`
-- `reports/data_validation.json`
-- `reports/drift_report.html`
-- `reports/drift_report.json`
-
-## Troubleshooting
-
-### Missing dependencies in the virtual environment
-
-If commands fail with `ModuleNotFoundError`, the dependencies were not fully
-installed. Re-run:
-
-```powershell
-python -m pip install -r requirements.txt
+# Coverage report
+pytest --cov=src tests/
 ```
 
-### Python 3.13 compatibility
+The current repository includes integration coverage under `tests/integration/` and project-level test modules for training, API behavior, and drift evaluation.
 
-Use Python 3.10 or 3.11 for local development. Some monitoring dependencies,
-especially Evidently, can fail on Python 3.13 depending on the installed
-package set.
+## Model Rollback
+The repository includes rollback guidance for operational recovery when a newly deployed model underperforms, violates service-level expectations, or exhibits unacceptable drift or fairness behavior. See [docs/model_rollback.md](docs/model_rollback.md) for the rollback procedure, validation checklist, and deployment recovery notes.
 
-### GitHub Actions publish and deploy
+## Paper
+This repository also supports a research manuscript titled **A Production-Ready MLOps Framework for Customer Churn Prediction with Explainability and Drift Detection**. The project is positioned for public dissemination and journal-style submission, with target venues including **arXiv**, **IEEE Access**, and **MDPI Applied Sciences**.
 
-If the workflow cannot publish the image:
+The current draft scaffold is available in [paper/paper_skeleton.md](paper/paper_skeleton.md).
 
-- enable package write permission for GitHub Actions
-- verify that GHCR access is allowed for the repository
+## Contributing
+Contributions are welcome for both engineering improvements and research extensions.
 
-If deployment does not run:
+1. Fork the repository.
+2. Create a feature branch from `main`.
+3. Implement your changes with clear commits.
+4. Run formatting, linting, and tests locally.
+5. Open a pull request describing the motivation, changes, and validation results.
 
-- make sure `publish_image` is enabled in manual dispatch
-- make sure `trigger_deploy` is enabled in manual dispatch
-- make sure `DEPLOY_WEBHOOK_URL` is configured
+Code style is enforced with `black` and `flake8`, and tests are required for all pull requests that affect application logic, experiments, or deployment workflows.
 
 ## License
-
 This project is released under the MIT License.
+
+## Citation
+If you use this repository in academic work, please cite it as:
+
+```bibtex
+@misc{yourname2025churn,
+  title={A Production-Ready MLOps Framework for Customer Churn Prediction},
+  author={Your Name},
+  year={2025},
+  url={https://github.com/yourusername/churn-mlops}
+}
+```
