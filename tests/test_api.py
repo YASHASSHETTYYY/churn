@@ -168,6 +168,58 @@ def test_explain_endpoint_returns_top_factors(client, sample_customer):
     assert len(payload["top_factors"]) > 0
 
 
+def test_retention_analyst_endpoint_returns_recommendations(client, sample_customer):
+    response = client.post(
+        "/retention/analyst",
+        json={"customer": sample_customer, "monthly_revenue": 70.0},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "analyst" in payload
+    assert "agents" in payload
+    assert payload["analyst"]["recommendations"]
+    assert 0.0 <= payload["agents"]["prediction_agent"]["churn_probability"] <= 1.0
+
+
+def test_retention_agents_endpoint_returns_agent_outputs(client, sample_customer):
+    response = client.post(
+        "/retention/agents",
+        json={"customer": sample_customer, "monthly_revenue": 70.0},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert set(payload["agents"]) == {
+        "prediction_agent",
+        "cause_agent",
+        "offer_agent",
+        "revenue_agent",
+    }
+
+
+def test_digital_twin_endpoint_returns_before_after(client, sample_customer):
+    response = client.post(
+        "/simulate/digital-twin",
+        json={
+            "customer": sample_customer,
+            "interventions": {
+                "service_calls_delta": -1,
+                "discount_percent": 10,
+                "plan_changes": {"international_plan": "no"},
+            },
+            "monthly_revenue": 70.0,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "baseline" in payload
+    assert "intervention" in payload
+    assert "impact" in payload
+    assert payload["intervention"]["customer"]["number_customer_service_calls"] == 1.0
+
+
 def test_predict_validation_rejects_bad_payload(client, sample_customer):
     invalid = dict(sample_customer)
     invalid["unexpected"] = 1

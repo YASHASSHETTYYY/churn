@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.config import load_config, resolve_path
 from src.models.predict import ChurnPredictor, ModelNotTrainedError
+from src.retention import build_retention_intelligence
 
 
 TOP_FACTORS = 8
@@ -395,6 +396,38 @@ def inject_css() -> None:
     padding: 14px;
   }
 
+  .agent-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .agent-name {
+    color: #9B99AA;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .agent-body {
+    color: #F0EEF8;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .recommendation-list {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .recommendation-list li {
+    color: #F0EEF8;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
   .summary-grid {
     display: grid;
     gap: 12px;
@@ -406,6 +439,7 @@ def inject_css() -> None:
     .app-header { flex-direction: column; }
     .header-meta { justify-content: flex-start; }
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .agent-grid { grid-template-columns: 1fr; }
     .feature-row { grid-template-columns: 1fr; }
   }
 </style>
@@ -858,6 +892,144 @@ def render_analytics_panel(
     render_feature_table(shap_df)
 
 
+def render_retention_intelligence_section(
+    predictor: ChurnPredictor,
+    customer: dict[str, Any],
+) -> None:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        """
+<div class="dash-card">
+  <div class="card-title">AI Churn Analyst</div>
+  <p class="app-subtitle">Plain-English risk explanation, retention agents, and digital twin intervention simulation.</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    intelligence = build_retention_intelligence(predictor)
+    monthly_revenue = st.number_input(
+        "Monthly revenue at risk",
+        min_value=1.0,
+        value=65.0,
+        step=5.0,
+    )
+
+    try:
+        analysis = intelligence.analyze_customer(
+            customer,
+            monthly_revenue=monthly_revenue,
+            top_k=TOP_FACTORS,
+        )
+    except Exception as exc:
+        st.markdown(
+            f'<div class="empty-state">Retention intelligence is unavailable: {exc}</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    analyst = analysis["analyst"]
+    agents = analysis["agents"]
+    st.markdown(
+        f"""
+<div class="dash-card">
+  <div class="card-title">Analyst Brief</div>
+  <div class="agent-body">{analyst["summary"]}</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    recommendation_items = "".join(
+        f"<li>{recommendation}</li>"
+        for recommendation in analyst["recommendations"]
+    )
+    st.markdown(
+        f"""
+<div class="dash-card">
+  <div class="card-title">Retention Recommendations</div>
+  <ol class="recommendation-list">{recommendation_items}</ol>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    prediction_agent = agents["prediction_agent"]
+    cause_agent = agents["cause_agent"]
+    offer_agent = agents["offer_agent"]
+    revenue_agent = agents["revenue_agent"]
+    cause_text = cause_agent["top_causes"][0] if cause_agent["top_causes"] else "No dominant cause found."
+    st.markdown(
+        f"""
+<div class="agent-grid">
+  <div class="dash-card compact">
+    <div class="agent-name">Prediction Agent</div>
+    <div class="agent-body">{prediction_agent["risk_tier"]} risk at {prediction_agent["churn_probability"]:.1%}</div>
+  </div>
+  <div class="dash-card compact">
+    <div class="agent-name">Cause Agent</div>
+    <div class="agent-body">{cause_text}</div>
+  </div>
+  <div class="dash-card compact">
+    <div class="agent-name">Offer Agent</div>
+    <div class="agent-body">{offer_agent["offer"]}: {offer_agent["discount_percent"]:.0f}%</div>
+  </div>
+  <div class="dash-card compact">
+    <div class="agent-name">Revenue Agent</div>
+    <div class="agent-body">Net saved estimate: ${revenue_agent["net_revenue_saved"]:,.0f}</div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="card-title">Customer Digital Twin Simulation</div>', unsafe_allow_html=True)
+    sim_cols = st.columns(4)
+    with sim_cols[0]:
+        service_delta = st.slider("Service calls change", -5, 3, -1)
+    with sim_cols[1]:
+        discount = st.slider("Discount percent", 0, 40, 10)
+    with sim_cols[2]:
+        international_plan = st.selectbox(
+            "International plan",
+            options=["no change", "yes", "no"],
+            index=0,
+        )
+    with sim_cols[3]:
+        day_usage_delta = st.slider("Day usage change", -50, 50, 0)
+
+    plan_changes = {}
+    if international_plan != "no change":
+        plan_changes["international_plan"] = international_plan
+
+    simulation = intelligence.simulate_digital_twin(
+        customer,
+        {
+            "service_calls_delta": float(service_delta),
+            "discount_percent": float(discount),
+            "plan_changes": plan_changes,
+            "day_usage_delta_percent": float(day_usage_delta),
+        },
+        monthly_revenue=monthly_revenue,
+    )
+    baseline_probability = float(
+        simulation["baseline"]["prediction"]["churn_probability"]
+    )
+    intervention_probability = float(
+        simulation["intervention"]["prediction"]["churn_probability"]
+    )
+    impact = simulation["impact"]
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Before", f"{baseline_probability:.1%}")
+    metric_cols[1].metric(
+        "After",
+        f"{intervention_probability:.1%}",
+        f"{impact['absolute_probability_change']:.1%}",
+    )
+    metric_cols[2].metric("Risk tier", impact["risk_tier_change"])
+    metric_cols[3].metric("Net revenue saved", f"${impact['net_revenue_saved']:,.0f}")
+
+
 # ---------------------------------------------------------------------------
 # Batch scoring
 # ---------------------------------------------------------------------------
@@ -1112,6 +1284,8 @@ def main() -> None:
 
     with right:
         render_analytics_panel(probability, tier, explanation, shap_error)
+
+    render_retention_intelligence_section(predictor, customer)
 
     st.markdown("<br>", unsafe_allow_html=True)
     render_batch_section(predictor)

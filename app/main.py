@@ -18,6 +18,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from src.models.predict import ChurnPredictor, ModelNotTrainedError
+from src.retention import build_retention_intelligence
 
 APP_CONFIG_PATH_ENV = "APP_CONFIG_PATH"
 MODEL_ARTIFACT_PATH_ENV = "MODEL_ARTIFACT_PATH"
@@ -95,6 +96,34 @@ class BatchPredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     customers: list[CustomerData] = Field(..., min_length=1, max_length=1000)
+
+
+class RetentionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer: CustomerData
+    monthly_revenue: Annotated[float, Field(gt=0)] = 65.0
+    top_k: Annotated[int, Field(ge=1, le=10)] = 5
+
+
+class DigitalTwinInterventions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service_calls_delta: float = 0.0
+    discount_percent: Annotated[float, Field(ge=0, le=100)] = 0.0
+    plan_changes: dict[str, str] = Field(default_factory=dict)
+    day_usage_delta_percent: float = 0.0
+    eve_usage_delta_percent: float = 0.0
+    night_usage_delta_percent: float = 0.0
+    intl_usage_delta_percent: float = 0.0
+
+
+class DigitalTwinRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer: CustomerData
+    interventions: DigitalTwinInterventions = Field(default_factory=DigitalTwinInterventions)
+    monthly_revenue: Annotated[float, Field(gt=0)] = 65.0
 
 
 def _get_drift_report_path() -> Path:
@@ -188,7 +217,16 @@ async def root():
         "service": "customer-churn-api",
         "status": "ok",
         "features": predictor.feature_names,
-        "endpoints": ["/predict", "/predict/batch", "/explain", "/health", "/metrics"],
+        "endpoints": [
+            "/predict",
+            "/predict/batch",
+            "/explain",
+            "/retention/analyst",
+            "/retention/agents",
+            "/simulate/digital-twin",
+            "/health",
+            "/metrics",
+        ],
     }
 
 
@@ -256,6 +294,85 @@ async def explain(customer: CustomerData):
         raise
     finally:
         _record_metrics(started_at, failed)
+
+
+@app.post("/retention/analyst")
+async def retention_analyst(payload: RetentionRequest):
+    started_at = time.perf_counter()
+    failed = False
+    probabilities: list[float] | None = None
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: build_retention_intelligence(get_predictor_sync()).analyze_customer(
+                _customer_to_dict(payload.customer),
+                monthly_revenue=payload.monthly_revenue,
+                top_k=payload.top_k,
+            ),
+        )
+        probabilities = [float(result["prediction"]["churn_probability"])]
+        return result
+    except Exception:
+        failed = True
+        raise
+    finally:
+        _record_metrics(started_at, failed, probabilities=probabilities)
+
+
+@app.post("/retention/agents")
+async def retention_agents(payload: RetentionRequest):
+    started_at = time.perf_counter()
+    failed = False
+    probabilities: list[float] | None = None
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: build_retention_intelligence(get_predictor_sync()).analyze_customer(
+                _customer_to_dict(payload.customer),
+                monthly_revenue=payload.monthly_revenue,
+                top_k=payload.top_k,
+            ),
+        )
+        probabilities = [float(result["prediction"]["churn_probability"])]
+        return {
+            "prediction": result["prediction"],
+            "agents": result["agents"],
+            "analyst_summary": result["analyst"]["summary"],
+        }
+    except Exception:
+        failed = True
+        raise
+    finally:
+        _record_metrics(started_at, failed, probabilities=probabilities)
+
+
+@app.post("/simulate/digital-twin")
+async def simulate_digital_twin(payload: DigitalTwinRequest):
+    started_at = time.perf_counter()
+    failed = False
+    probabilities: list[float] | None = None
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: build_retention_intelligence(get_predictor_sync()).simulate_digital_twin(
+                _customer_to_dict(payload.customer),
+                payload.interventions.model_dump(),
+                monthly_revenue=payload.monthly_revenue,
+            ),
+        )
+        probabilities = [
+            float(result["baseline"]["prediction"]["churn_probability"]),
+            float(result["intervention"]["prediction"]["churn_probability"]),
+        ]
+        return result
+    except Exception:
+        failed = True
+        raise
+    finally:
+        _record_metrics(started_at, failed, probabilities=probabilities)
 
 
 @app.get("/metrics")
