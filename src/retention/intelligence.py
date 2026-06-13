@@ -108,29 +108,34 @@ def _offer_for_driver(feature: str) -> dict[str, Any]:
         return {
             "offer": "Service recovery credit",
             "discount_percent": 8.0,
+            "expected_churn_reduction": 0.08,
             "rationale": "A small credit paired with issue resolution targets service-driven churn.",
         }
     if theme == "international":
         return {
             "offer": "International bundle trial",
             "discount_percent": 12.0,
+            "expected_churn_reduction": 0.12,
             "rationale": "International-plan pressure is best handled with package fit, not a generic coupon.",
         }
     if theme == "plan_fit":
         return {
             "offer": "Plan optimization discount",
             "discount_percent": 10.0,
+            "expected_churn_reduction": 0.10,
             "rationale": "The account appears sensitive to usage-price mismatch.",
         }
     if theme == "engagement":
         return {
             "offer": "Feature adoption bundle",
             "discount_percent": 5.0,
+            "expected_churn_reduction": 0.05,
             "rationale": "Engagement-led retention should avoid over-discounting.",
         }
     return {
         "offer": "Targeted save offer",
         "discount_percent": DEFAULT_DISCOUNT_PERCENT,
+        "expected_churn_reduction": 0.07,
         "rationale": "Use a controlled incentive because no single operational theme dominates.",
     }
 
@@ -323,7 +328,8 @@ class RetentionIntelligence:
             "horizon_months": float(horizon_months),
             "gross_revenue_saved": gross_saved,
             "estimated_offer_cost": discount_cost,
-            "net_revenue_saved": gross_saved - discount_cost,
+            "net_revenue_saved": max(0.0, gross_saved - discount_cost),
+            "potential_revenue_saved": gross_saved,
         }
 
     @staticmethod

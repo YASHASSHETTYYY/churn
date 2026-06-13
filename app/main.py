@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import os
@@ -8,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import FastAPI, Request
+from fastapi import Body, FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
@@ -238,7 +236,7 @@ async def health():
 
 @app.post("/predict")
 @limiter.limit("100/minute")
-async def predict(request: Request, customer: CustomerData):
+async def predict(request: Request, customer: CustomerData = Body(...)):
     del request
     started_at = time.perf_counter()
     failed = False

@@ -5,8 +5,8 @@
 ![MLflow](https://img.shields.io/badge/MLflow-Tracked-0194E2)
 ![DVC](https://img.shields.io/badge/DVC-Versioned-945DD6)
 
-# Churn Prediction MLOps Framework
-> End-to-end customer churn prediction with explainability, drift detection, fairness auditing, and AI-assisted retention intelligence.
+# Customer Churn Intelligence Platform
+> End-to-end customer churn analytics with prediction serving, explainability, retention planning, drift monitoring, and MLOps-ready deployment.
 
 ## Table of Contents
 - [Project Highlights](#project-highlights)
@@ -33,8 +33,8 @@
 ## Project Highlights
 - Compares five production-relevant learners: Random Forest, Gradient Boosting, XGBoost, LightGBM, and CatBoost, with bootstrap confidence intervals for robust model comparison.
 - Serves churn predictions through FastAPI with single-customer scoring, batch scoring, explanations, Prometheus metrics, and rate limiting.
-- Provides a Streamlit "Churn Intelligence Hub" for real-time scoring, SHAP factor review, batch uploads, retention recommendations, and intervention simulation.
-- Adds AI-assisted retention intelligence with a plain-English analyst brief, prediction/cause/offer/revenue agent outputs, and customer digital twin what-if analysis.
+- Provides a Streamlit customer analytics dashboard with executive KPIs, tabbed customer inputs, radial risk scoring, model confidence, CLV, model comparison, sample CSV download, and bulk prediction export.
+- Adds retention intelligence with a plain-English analyst brief, prediction/cause/offer/revenue agent outputs, expected churn-reduction estimates, and customer digital twin what-if analysis.
 - Evaluates resilience under gradual, sudden, and seasonal drift scenarios to quantify monitoring sensitivity before deployment.
 - Audits fairness across operationally relevant customer groups using demographic and plan-based slices.
 - Integrates MLflow, DVC, Docker Compose, Prometheus, Grafana, FastAPI, Streamlit, and GitHub Actions for reproducible research and deployment readiness.
@@ -44,7 +44,7 @@
 
 For ML engineers, this repository provides a complete lifecycle implementation: data validation, preprocessing, training, experiment tracking, evaluation, explainability generation, REST API serving, dashboarding, monitoring, drift analysis, and rollback documentation.
 
-For business and retention workflows, the current application goes beyond prediction by turning model outputs into operational recommendations. The retention layer explains the strongest churn drivers in plain English, proposes targeted offers, estimates revenue impact, and simulates customer profile changes before outreach.
+For business and retention workflows, the application goes beyond prediction by turning model outputs into operational recommendations. The dashboard combines portfolio-level risk, customer-level prediction, feature impact analysis, recommended save actions, revenue estimates, and scenario simulation in a calmer SaaS-style analytics interface.
 
 ## Architecture Diagram
 ```mermaid
@@ -58,7 +58,7 @@ flowchart LR
   E --> H[Result Tables]
   C --> I[Model Artifact]
   I --> J[FastAPI Serving]
-  I --> K[Streamlit Dashboard]
+  I --> K[Customer Analytics Dashboard]
   J --> L[Retention Intelligence]
   K --> L
   L --> M[Digital Twin Simulation]
@@ -73,7 +73,7 @@ flowchart LR
 |-- app/
 |   `-- main.py                    # FastAPI serving layer
 |-- dashboard/
-|   `-- streamlit_app.py            # Churn Intelligence Hub
+|   `-- streamlit_app.py            # Customer churn analytics dashboard
 |-- data/
 |   |-- external/
 |   |-- raw/
@@ -141,7 +141,7 @@ Service URLs:
 | Service | URL |
 |---|---|
 | FastAPI | `http://localhost:8000` |
-| Streamlit dashboard | `http://localhost:8501` |
+| Customer analytics dashboard | `http://localhost:8501` |
 | Prometheus | `http://localhost:9090` |
 | Grafana | `http://localhost:3000` |
 
@@ -149,7 +149,7 @@ Service URLs:
 The project exposes two primary user-facing interfaces:
 
 - **FastAPI serving API**: prediction, batch prediction, SHAP explanation, retention analyst output, retention agent output, digital twin simulation, health checks, and Prometheus metrics.
-- **Streamlit Churn Intelligence Hub**: interactive customer profile scoring, churn probability gauge, SHAP driver table, batch CSV scoring, retention analyst brief, retention recommendations, and customer intervention simulation.
+- **Streamlit customer analytics dashboard**: executive KPI summary, tabbed customer profile form, radial risk score, model confidence, CLV estimate, customer segmentation, SHAP feature impact chart, retention review, PDF/text customer analysis export, sample CSV download, bulk churn prediction, and model comparison.
 
 ## Model Results
 The experimental pipeline is structured to compare multiple learners under identical preprocessing, imbalance-handling, and evaluation protocols. Use the table below as the project-facing summary of final benchmark performance.
@@ -169,7 +169,7 @@ SHAP is used to interpret both global model behavior and individual predictions,
 
 ![SHAP Summary](plots/shap_beeswarm.png)
 
-Explainability utilities live under `src/explainability/`, including `shap_analysis.py` and `generate_shap_artifacts.py`.
+Explainability utilities live under `src/explainability/`, including `shap_analysis.py` and `generate_shap_artifacts.py`. The dashboard surfaces the customer-level SHAP output as a full-width feature impact analysis with positive/negative contribution labels.
 
 ## Retention Intelligence
 The retention layer translates model outputs into actions for save teams and customer success workflows.
@@ -179,8 +179,9 @@ Current capabilities:
 - Plain-English analyst summary with churn probability, risk tier, top drivers, and recommended next actions.
 - Agent outputs for prediction, cause analysis, offer selection, and revenue impact.
 - Targeted offer suggestions such as service recovery credits, international bundle trials, plan optimization discounts, and adoption nudges.
+- Expected churn-reduction badges for recommended save actions.
 - Customer digital twin simulation that applies interventions and compares baseline vs intervention churn risk.
-- Revenue impact estimates using monthly revenue, offer cost, and a configurable annual horizon.
+- Revenue impact estimates using monthly revenue, offer cost, potential revenue saved, and a configurable annual horizon.
 
 The implementation lives in `src/retention/intelligence.py` and is available from both FastAPI and the Streamlit dashboard.
 
@@ -206,7 +207,7 @@ Fairlearn `MetricFrame` is used to summarize subgroup behavior and document trad
 | Experiment tracking | MLflow | Log models, metrics, parameters, and artifacts |
 | Data versioning | DVC | Reproducible data and pipeline runs |
 | Model serving | FastAPI | Async REST API with validation, rate limiting, and metrics |
-| Dashboard | Streamlit | Interactive scoring, explanations, batch analytics, and retention workflows |
+| Dashboard | Streamlit | Customer analytics, tabbed scoring workflow, explainability, bulk prediction, exports, and retention workflows |
 | Explainability | SHAP | Global and local feature contribution analysis |
 | Monitoring | Prometheus + Grafana | Prediction metrics and operational dashboards |
 | Drift analysis | PSI + Evidently | Drift simulation and reporting |
@@ -351,19 +352,24 @@ python src/fairness/fairness_audit.py
 ## Testing
 ```bash
 # Run all tests
-pytest
+python -m pytest
 
 # API and retention coverage
-pytest tests/test_api.py tests/test_retention_intelligence.py
+python -m pytest tests/test_api.py tests/test_retention_intelligence.py
 
 # Integration tests
-pytest tests/integration/
+python -m pytest tests/integration/
 
 # Coverage report
-pytest --cov=src tests/
+python -m pytest --cov=src tests/
 ```
 
-The current test suite includes coverage for training, API behavior, drift monitoring, and retention intelligence.
+The current test suite includes coverage for training, API behavior, drift monitoring, and retention intelligence. The latest focused validation passed with:
+
+```bash
+python -m py_compile app/main.py dashboard/streamlit_app.py src/retention/intelligence.py
+python -m pytest tests/test_retention_intelligence.py tests/test_api.py
+```
 
 ## Model Rollback
 The repository includes rollback guidance for operational recovery when a newly deployed model underperforms, violates service-level expectations, or exhibits unacceptable drift or fairness behavior. See `docs/model_rollback.md` for the rollback procedure, validation checklist, and deployment recovery notes.

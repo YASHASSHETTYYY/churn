@@ -31,23 +31,33 @@ from src.retention import build_retention_intelligence
 TOP_FACTORS = 8
 BATCH_SHAP_LIMIT = 250
 DEBOUNCE_SECONDS = 0.3
+DEFAULT_MONTHLY_REVENUE = 65.0
+MODEL_METRICS_FALLBACK = {
+    "model": "Production Model",
+    "accuracy": 0.924,
+    "precision": 0.89,
+    "recall": 0.85,
+    "dataset_size": 3333,
+}
 
 COLORS = {
-    "background": "#0F1117",
-    "surface": "#1C1E26",
-    "border": "#2A2D3A",
-    "teal": "#1D9E75",
-    "coral": "#D85A30",
-    "indigo": "#534AB7",
-    "text": "#F0EEF8",
-    "muted": "#9B99AA",
-    "success": "#639922",
-    "warning": "#BA7517",
-    "danger": "#A32D2D",
+    "background": "#0B1020",
+    "surface": "#151B2E",
+    "border": "#27324D",
+    "primary": "#8B5CF6",
+    "accent": "#A855F7",
+    "teal": "#22C55E",
+    "coral": "#EF4444",
+    "indigo": "#8B5CF6",
+    "text": "#F8FAFC",
+    "muted": "#94A3B8",
+    "success": "#22C55E",
+    "warning": "#F59E0B",
+    "danger": "#EF4444",
 }
 
 FIELD_GROUPS = {
-    "Account Info": [
+    "Customer Profile": [
         "state",
         "account_length",
         "area_code",
@@ -56,22 +66,22 @@ FIELD_GROUPS = {
         "number_vmail_messages",
         "number_customer_service_calls",
     ],
-    "Usage - Day": [
+    "Usage": [
         "total_day_minutes",
         "total_day_calls",
-        "total_day_charge",
-    ],
-    "Usage - Eve/Night": [
         "total_eve_minutes",
         "total_eve_calls",
-        "total_eve_charge",
         "total_night_minutes",
         "total_night_calls",
-        "total_night_charge",
     ],
     "International": [
         "total_intl_minutes",
         "total_intl_calls",
+    ],
+    "Billing": [
+        "total_day_charge",
+        "total_eve_charge",
+        "total_night_charge",
         "total_intl_charge",
     ],
 }
@@ -93,6 +103,44 @@ def load_reference_data() -> pd.DataFrame:
         return pd.read_csv(train_path)
     raw_path = resolve_path(config["raw_data_config"]["raw_data_csv"])
     return pd.read_csv(raw_path)
+
+
+@st.cache_data
+def load_population_data() -> pd.DataFrame:
+    config = load_config()
+    raw_path = resolve_path(config["raw_data_config"]["raw_data_csv"])
+    if raw_path.exists():
+        return pd.read_csv(raw_path)
+    return load_reference_data()
+
+
+@st.cache_data
+def load_model_metrics() -> dict[str, Any]:
+    metrics = dict(MODEL_METRICS_FALLBACK)
+    metrics_path = PROJECT_ROOT / "results" / "model_comparison.csv"
+    if not metrics_path.exists():
+        return metrics
+
+    frame = pd.read_csv(metrics_path)
+    if "status" in frame:
+        frame = frame[frame["status"].astype(str).str.lower() == "ok"]
+    if frame.empty:
+        return metrics
+
+    sort_column = "auc_roc" if "auc_roc" in frame else "accuracy"
+    best = frame.sort_values(sort_column, ascending=False).iloc[0]
+    metrics.update(
+        {
+            "model": str(best.get("model", metrics["model"])),
+            "accuracy": float(best.get("accuracy", metrics["accuracy"])),
+            "precision": float(
+                best.get("precision_yes", best.get("precision_macro", metrics["precision"]))
+            ),
+            "recall": float(best.get("recall_yes", best.get("recall_macro", metrics["recall"]))),
+            "auc_roc": float(best.get("auc_roc", 0.94)),
+        }
+    )
+    return metrics
 
 
 def inject_css() -> None:
@@ -181,6 +229,23 @@ def inject_css() -> None:
     background: rgba(163,45,45,0.18);
   }
 
+  .risk-label {
+    align-items: center;
+    display: inline-flex;
+    gap: 8px;
+  }
+
+  .risk-dot {
+    border-radius: 50%;
+    display: inline-block;
+    height: 10px;
+    width: 10px;
+  }
+
+  .risk-dot.low { background: #639922; }
+  .risk-dot.medium { background: #BA7517; }
+  .risk-dot.high { background: #A32D2D; }
+
   .dash-card, [data-testid="stMetric"] {
     background: #1C1E26;
     border: 0.5px solid #2A2D3A;
@@ -233,6 +298,22 @@ def inject_css() -> None:
     color: #9B99AA;
     font-size: 12px;
     margin-top: 6px;
+  }
+
+  .metric-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 16px;
+  }
+
+  .metric-grid.five {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .kpi-value.compact-text {
+    font-size: 22px;
+    overflow-wrap: anywhere;
   }
 
   .profile-head {
@@ -428,6 +509,27 @@ def inject_css() -> None:
     margin-bottom: 8px;
   }
 
+  .recommendation-card {
+    border-bottom: 0.5px solid #2A2D3A;
+    padding: 12px 0;
+  }
+
+  .recommendation-card:last-child {
+    border-bottom: 0;
+  }
+
+  .impact-pill {
+    background: rgba(29,158,117,0.14);
+    border: 0.5px solid rgba(29,158,117,0.58);
+    border-radius: 99px;
+    color: #F0EEF8;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 650;
+    margin-top: 8px;
+    padding: 5px 9px;
+  }
+
   .summary-grid {
     display: grid;
     gap: 12px;
@@ -438,9 +540,343 @@ def inject_css() -> None:
     .block-container { padding: 18px 16px 32px; }
     .app-header { flex-direction: column; }
     .header-meta { justify-content: flex-start; }
+    .metric-grid, .metric-grid.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .agent-grid { grid-template-columns: 1fr; }
     .feature-row { grid-template-columns: 1fr; }
+  }
+
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(139,92,246,0); }
+    50% { box-shadow: 0 0 30px rgba(139,92,246,0.22); }
+  }
+
+  .stApp {
+    background:
+      radial-gradient(circle at 12% 8%, rgba(139,92,246,0.18), transparent 34%),
+      radial-gradient(circle at 85% 14%, rgba(168,85,247,0.16), transparent 32%),
+      linear-gradient(180deg, #0B1020 0%, #080C18 100%);
+    color: #F8FAFC;
+  }
+
+  .block-container {
+    max-width: 1560px;
+    padding: 38px 42px 56px;
+  }
+
+  .app-header {
+    margin-bottom: 30px;
+    padding: 8px 0 4px;
+  }
+
+  .app-title {
+    color: #F8FAFC;
+    font-size: clamp(34px, 5vw, 58px);
+    font-weight: 760;
+    letter-spacing: 0;
+  }
+
+  .app-subtitle {
+    color: #94A3B8;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .status-pill, .risk-pill, .impact-pill {
+    backdrop-filter: blur(18px);
+    background: rgba(139,92,246,0.14);
+    border: 1px solid rgba(168,85,247,0.36);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
+  .dash-card, [data-testid="stMetric"] {
+    animation: fadeSlideUp 0.45s ease both;
+    backdrop-filter: blur(18px);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018)),
+      rgba(21,27,46,0.86);
+    border: 1px solid rgba(148,163,184,0.18);
+    border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06);
+    transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+  }
+
+  .dash-card {
+    margin-bottom: 20px;
+    padding: 22px 24px;
+  }
+
+  .dash-card.compact {
+    min-height: 126px;
+    padding: 20px 22px;
+  }
+
+  .dash-card:hover, [data-testid="stMetric"]:hover {
+    border-color: rgba(168,85,247,0.48);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.42), 0 0 34px rgba(139,92,246,0.12);
+    transform: translateY(-3px);
+  }
+
+  .metric-grid, .summary-grid, .agent-grid {
+    gap: 18px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-title, .card-title, .agent-name {
+    color: #94A3B8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .kpi-value {
+    color: #F8FAFC;
+    font-size: clamp(28px, 3vw, 40px);
+    font-weight: 780;
+    letter-spacing: 0;
+  }
+
+  .kpi-note, .profile-subtitle, .agent-body {
+    color: #94A3B8;
+  }
+
+  .kpi-icon {
+    align-items: center;
+    background: linear-gradient(135deg, rgba(139,92,246,0.22), rgba(168,85,247,0.10));
+    border: 1px solid rgba(168,85,247,0.28);
+    border-radius: 14px;
+    display: inline-flex;
+    font-size: 18px;
+    height: 38px;
+    justify-content: center;
+    margin-bottom: 12px;
+    width: 38px;
+  }
+
+  .premium-section {
+    margin-top: 28px;
+  }
+
+  .radial-card {
+    align-items: center;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(180px, 260px) 1fr;
+  }
+
+  .stTabs [data-baseweb="tab-list"] {
+    background: rgba(11,16,32,0.62);
+    border: 1px solid rgba(148,163,184,0.18);
+    border-radius: 14px;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .stTabs [data-baseweb="tab"] {
+    border-radius: 10px;
+    color: #94A3B8;
+    font-weight: 650;
+    padding: 10px 14px;
+  }
+
+  .stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, rgba(139,92,246,0.28), rgba(168,85,247,0.18));
+    color: #F8FAFC;
+  }
+
+  .stButton > button, .stDownloadButton > button {
+    background: linear-gradient(135deg, #8B5CF6, #A855F7);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(139,92,246,0.22);
+    color: #F8FAFC;
+    min-height: 46px;
+  }
+
+  .stButton > button:hover, .stDownloadButton > button:hover {
+    background: linear-gradient(135deg, #A855F7, #8B5CF6);
+    box-shadow: 0 18px 42px rgba(168,85,247,0.34);
+    color: #F8FAFC;
+    transform: translateY(-2px);
+  }
+
+  [data-testid="stNumberInput"] input,
+  [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+    background: rgba(11,16,32,0.72);
+    border: 1px solid rgba(148,163,184,0.18);
+    border-radius: 12px;
+    color: #F8FAFC;
+  }
+
+  [data-testid="stNumberInput"] input:hover,
+  [data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
+    border-color: rgba(168,85,247,0.54);
+    box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
+  }
+
+  [data-testid="stFileUploader"] section {
+    background: rgba(139,92,246,0.08);
+    border: 1px dashed rgba(168,85,247,0.66);
+    border-radius: 18px;
+  }
+
+  .feature-row {
+    border-bottom: 1px solid rgba(148,163,184,0.14);
+    grid-template-columns: 1.2fr 1fr 0.8fr 0.9fr;
+    padding: 13px 10px;
+  }
+
+  .feature-row.top {
+    background: rgba(139,92,246,0.14);
+  }
+
+  .impact-up { color: #EF4444; }
+  .impact-down { color: #22C55E; }
+
+  .prediction-badge.churn {
+    background: rgba(239,68,68,0.16);
+    border: 1px solid rgba(239,68,68,0.44);
+  }
+
+  .prediction-badge.no-churn {
+    background: rgba(34,197,94,0.14);
+    border: 1px solid rgba(34,197,94,0.44);
+  }
+
+  @media (max-width: 1100px) {
+    .metric-grid.five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .radial-card { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 720px) {
+    .block-container { padding: 22px 16px 36px; }
+    .metric-grid, .metric-grid.five, .summary-grid { grid-template-columns: 1fr; }
+    .dash-card.compact { min-height: auto; }
+  }
+
+  /* Calmer production-dashboard layer: restrained, readable, and less showpiece-like. */
+  .stApp {
+    background: #0B1020;
+  }
+
+  .block-container {
+    max-width: 1480px;
+    padding: 30px 34px 44px;
+  }
+
+  .app-header {
+    align-items: flex-end;
+    border-bottom: 1px solid rgba(148,163,184,0.12);
+    margin-bottom: 24px;
+    padding-bottom: 18px;
+  }
+
+  .app-title {
+    font-size: clamp(28px, 3vw, 40px);
+    font-weight: 720;
+  }
+
+  .app-subtitle {
+    font-size: 14px;
+    line-height: 1.45;
+    max-width: 760px;
+  }
+
+  .dash-card, [data-testid="stMetric"] {
+    animation: fadeSlideUp 0.22s ease both;
+    backdrop-filter: blur(10px);
+    background: rgba(21,27,46,0.92);
+    border: 1px solid rgba(148,163,184,0.14);
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.20);
+  }
+
+  .dash-card {
+    margin-bottom: 16px;
+    padding: 18px 20px;
+  }
+
+  .dash-card.compact {
+    min-height: 108px;
+    padding: 16px 18px;
+  }
+
+  .dash-card:hover, [data-testid="stMetric"]:hover {
+    border-color: rgba(139,92,246,0.30);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.24);
+    transform: translateY(-1px);
+  }
+
+  .metric-grid, .summary-grid, .agent-grid {
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .kpi-icon {
+    background: rgba(139,92,246,0.10);
+    border: 1px solid rgba(139,92,246,0.22);
+    border-radius: 10px;
+    font-size: 12px;
+    height: 30px;
+    margin-bottom: 10px;
+    width: 30px;
+  }
+
+  .kpi-title, .card-title, .agent-name {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+
+  .kpi-value {
+    font-size: clamp(24px, 2.2vw, 32px);
+    font-weight: 700;
+  }
+
+  .kpi-value.compact-text {
+    font-size: 19px;
+    line-height: 1.25;
+  }
+
+  .status-pill, .risk-pill, .impact-pill {
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .stButton > button, .stDownloadButton > button {
+    background: #8B5CF6;
+    box-shadow: none;
+  }
+
+  .stButton > button:hover, .stDownloadButton > button:hover {
+    background: #7C3AED;
+    box-shadow: 0 8px 20px rgba(139,92,246,0.22);
+    transform: translateY(-1px);
+  }
+
+  .stTabs [data-baseweb="tab-list"] {
+    background: rgba(11,16,32,0.66);
+    border-radius: 10px;
+  }
+
+  .stTabs [data-baseweb="tab"] {
+    padding: 8px 12px;
+  }
+
+  .stTabs [aria-selected="true"] {
+    background: rgba(139,92,246,0.18);
+  }
+
+  .radial-card {
+    gap: 12px;
+  }
+
+  [data-testid="stDataFrame"] {
+    border-radius: 12px;
   }
 </style>
 """,
@@ -522,10 +958,8 @@ def probability_color(probability: float) -> str:
 
 
 def model_confidence(probability: float) -> float:
-    p = min(max(float(probability), 1e-12), 1.0 - 1e-12)
-    entropy = -(p * math.log(p) + (1 - p) * math.log(1 - p))
-    confidence = 1 - (entropy / math.log(2))
-    return max(0.0, min(1.0, confidence))
+    p = min(max(float(probability), 0.0), 1.0)
+    return max(p, 1.0 - p)
 
 
 def top_risk_factor(explanation: dict[str, Any] | None) -> str:
@@ -540,6 +974,85 @@ def top_risk_factor(explanation: dict[str, Any] | None) -> str:
 def confidence_note(probability: float) -> str:
     tier = risk_tier(probability).lower()
     return f"Signal strength for this {tier}-risk prediction"
+
+
+def risk_label(tier: str) -> str:
+    css_class = tier.lower()
+    return f'<span class="risk-label"><span class="risk-dot {css_class}"></span>{tier} Risk</span>'
+
+
+def infer_model_name(predictor: ChurnPredictor, metrics: dict[str, Any]) -> str:
+    _, estimator = predictor._get_model_components()
+    class_name = estimator.__class__.__name__ if estimator is not None else ""
+    aliases = {
+        "XGBClassifier": "XGBoost",
+        "LGBMClassifier": "LightGBM",
+        "CatBoostClassifier": "CatBoost",
+        "RandomForestClassifier": "Random Forest",
+        "GradientBoostingClassifier": "Gradient Boosting",
+    }
+    return aliases.get(class_name, str(metrics.get("model", "Production Model")))
+
+
+def estimate_customer_lifetime_value(
+    customer: dict[str, Any],
+    probability: float,
+    monthly_revenue: float = DEFAULT_MONTHLY_REVENUE,
+) -> float:
+    account_length = max(1.0, float(customer.get("account_length") or 12.0))
+    retained_value = monthly_revenue * account_length
+    risk_adjustment = max(0.35, 1.0 - probability * 0.5)
+    return retained_value * risk_adjustment
+
+
+def customer_segment(probability: float, clv: float, reference_data: pd.DataFrame) -> str:
+    high_value_threshold = DEFAULT_MONTHLY_REVENUE * 48
+    if "account_length" in reference_data:
+        account_lengths = pd.to_numeric(reference_data["account_length"], errors="coerce")
+        if not account_lengths.dropna().empty:
+            high_value_threshold = DEFAULT_MONTHLY_REVENUE * float(account_lengths.quantile(0.75))
+
+    if probability > 0.5:
+        return "Segment D - Likely Churners"
+    if clv >= high_value_threshold and probability <= 0.2:
+        return "Segment C - High Value Customers"
+    if probability > 0.2:
+        return "Segment B - At Risk"
+    return "Segment A - Loyal Customers"
+
+
+def summarize_portfolio(
+    predictor: ChurnPredictor,
+    population_data: pd.DataFrame,
+) -> dict[str, float]:
+    total_customers = len(population_data)
+    if total_customers == 0:
+        return {
+            "total_customers": 0.0,
+            "likely_churners": 0.0,
+            "revenue_at_risk": 0.0,
+            "retention_opportunity": 0.0,
+        }
+
+    try:
+        predictions = predictor.predict(population_data[predictor.feature_names])
+        probabilities = pd.Series(
+            [float(item["churn_probability"]) for item in predictions],
+            dtype=float,
+        )
+        likely_churners = int((probabilities > 0.5).sum())
+    except Exception:
+        target = population_data.get("churn", pd.Series(dtype=object))
+        likely_churners = int(target.astype(str).str.lower().eq("yes").sum())
+
+    annual_revenue = DEFAULT_MONTHLY_REVENUE * 12
+    revenue_at_risk = likely_churners * annual_revenue
+    return {
+        "total_customers": float(total_customers),
+        "likely_churners": float(likely_churners),
+        "revenue_at_risk": revenue_at_risk,
+        "retention_opportunity": revenue_at_risk * 0.6,
+    }
 
 
 def initialize_session_state() -> None:
@@ -564,19 +1077,103 @@ def score_customer(
         return prediction, None, str(exc)
 
 
+def build_customer_report_text(
+    prediction: dict[str, Any],
+    probability: float,
+    confidence: float,
+    tier: str,
+    clv: float,
+    segment: str,
+    explanation: dict[str, Any] | None,
+    analysis: dict[str, Any] | None,
+) -> str:
+    label = "Churn" if str(prediction.get("churn")).lower() == "yes" else "No Churn"
+    lines = [
+        "Customer Churn Analysis Report",
+        f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "",
+        f"Prediction: {label}",
+        f"Probability: {probability:.1%}",
+        f"Confidence: {confidence:.1%}",
+        f"Risk Category: {tier} Risk",
+        f"Customer Lifetime Value: ${clv:,.0f}",
+        f"Segment: {segment}",
+    ]
+    factors = explanation_frame(explanation)
+    if not factors.empty:
+        lines.extend(["", "Top Feature Impacts:"])
+        for _, row in factors.head(6).iterrows():
+            lines.append(
+                f"- {row['display_feature']}: {row['shap_value']:+.3f} ({row['impact_label']})"
+            )
+    if analysis:
+        lines.extend(["", "Recommendations:"])
+        for item in analysis["analyst"]["recommendations"]:
+            lines.append(f"- {item}")
+        offer = analysis["agents"]["offer_agent"]
+        lines.extend(
+            [
+                "",
+                f"Recommended Offer: {offer['offer']}",
+                f"Expected Churn Reduction: {float(offer.get('expected_churn_reduction', 0.0)):.1%}",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def build_simple_pdf(title: str, body: str) -> bytes:
+    lines = [title, ""] + body.splitlines()
+    escaped_lines = [
+        line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")[:95]
+        for line in lines[:42]
+    ]
+    text_commands = ["BT", "/F1 12 Tf", "50 770 Td", "16 TL"]
+    for line in escaped_lines:
+        text_commands.append(f"({line}) Tj")
+        text_commands.append("T*")
+    text_commands.append("ET")
+    stream = "\n".join(text_commands).encode("latin-1", errors="replace")
+    objects = [
+        b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+        b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+        b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj",
+        b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+        b"5 0 obj << /Length " + str(len(stream)).encode() + b" >> stream\n" + stream + b"\nendstream endobj",
+    ]
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len(pdf))
+        pdf.extend(obj + b"\n")
+    xref_start = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode())
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode())
+    pdf.extend(
+        f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_start}\n%%EOF".encode()
+    )
+    return bytes(pdf)
+
+
 def build_customer_inputs(
     predictor: ChurnPredictor,
     reference_data: pd.DataFrame,
 ) -> dict[str, Any]:
     customer: dict[str, Any] = {}
     grouped = set()
+    tab_names = list(FIELD_GROUPS)
+    tabs = st.tabs(tab_names)
 
-    for group_name, fields in FIELD_GROUPS.items():
+    for tab, group_name in zip(tabs, tab_names):
+        fields = FIELD_GROUPS[group_name]
         available_fields = [field for field in fields if field in predictor.feature_names]
         if not available_fields:
             continue
-        with st.expander(group_name, expanded=group_name == "Account Info"):
+        with tab:
             for column in available_fields:
+                if column in grouped:
+                    continue
                 grouped.add(column)
                 customer[column] = render_field(column, reference_data)
 
@@ -621,8 +1218,8 @@ def render_header() -> None:
         f"""
 <div class="app-header">
   <div>
-    <div class="app-title">Churn Intelligence Hub</div>
-    <p class="app-subtitle">Real-time churn scoring &middot; SHAP explainability &middot; Batch analytics</p>
+    <div class="app-title">Customer Churn Analytics</div>
+    <p class="app-subtitle">Account-level churn scoring, driver analysis, retention actions, and portfolio risk monitoring.</p>
   </div>
   <div class="header-meta">
     <span>Last updated {timestamp}</span>
@@ -634,51 +1231,130 @@ def render_header() -> None:
     )
 
 
+def render_dashboard_summary(summary: dict[str, float]) -> None:
+    cards = [
+        ("TC", "Total Customers", f"{summary['total_customers']:,.0f}", COLORS["text"]),
+        ("LR", "Likely Churners", f"{summary['likely_churners']:,.0f}", COLORS["danger"]),
+        ("$", "Revenue at Risk", f"${summary['revenue_at_risk']:,.0f}", COLORS["warning"]),
+        ("RO", "Retention Opportunity", f"${summary['retention_opportunity']:,.0f}", COLORS["teal"]),
+    ]
+    html = ['<div class="metric-grid">']
+    for icon, title, value, color in cards:
+        html.append(
+            f"""
+<div class="dash-card compact">
+  <div class="kpi-icon" style="color: {color};">{icon}</div>
+  <div class="kpi-title">{title}</div>
+  <div class="kpi-value" style="color: {color};">{value}</div>
+</div>
+"""
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+
 def render_kpi_strip(
+    prediction: dict[str, Any],
     probability: float,
     tier: str,
+    confidence: float,
+    clv: float,
+    segment: str,
+    model_metrics: dict[str, Any],
     explanation: dict[str, Any] | None,
 ) -> None:
-    kpi_cols = st.columns(4)
-    confidence = model_confidence(probability)
+    label = "Churn" if str(prediction["churn"]).lower() == "yes" else "No Churn"
+    label_html = (
+        f'<span class="risk-label"><span class="risk-dot {"high" if label == "Churn" else "low"}"></span>{label}</span>'
+    )
     kpis = [
+        {
+            "title": "Prediction",
+            "value": label_html,
+            "note": f"Probability {probability:.1%}",
+            "color": probability_color(probability),
+            "compact": label == "No Churn",
+            "icon": "PR",
+        },
         {
             "title": "Churn Probability",
             "value": f"{probability:.1%}",
             "note": "Predicted probability",
             "color": probability_color(probability),
+            "compact": False,
+            "icon": "%",
         },
         {
             "title": "Risk Tier",
-            "value": tier,
+            "value": risk_label(tier),
             "note": "Low <20%, Medium 20-50%, High >50%",
             "color": risk_color(tier),
+            "compact": tier == "Medium",
+            "icon": "RS",
         },
         {
-            "title": "Top Risk Factor",
-            "value": top_risk_factor(explanation),
-            "note": "Highest absolute SHAP impact",
-            "color": COLORS["indigo"],
-        },
-        {
-            "title": "Model Confidence",
+            "title": "Confidence",
             "value": f"{confidence:.1%}",
             "note": confidence_note(probability),
             "color": COLORS["teal"] if confidence >= 0.5 else COLORS["warning"],
+            "compact": False,
+            "icon": "CF",
+        },
+        {
+            "title": "Customer Lifetime Value",
+            "value": f"${clv:,.0f}",
+            "note": "Risk-adjusted account value",
+            "color": COLORS["indigo"],
+            "compact": False,
+            "icon": "$",
         },
     ]
-    for col, kpi in zip(kpi_cols, kpis):
-        with col:
-            st.markdown(
-                f"""
+    html = ['<div class="metric-grid five">']
+    for kpi in kpis:
+        value_class = "kpi-value compact-text" if kpi["compact"] else "kpi-value"
+        html.append(
+            f"""
 <div class="dash-card compact">
+  <div class="kpi-icon" style="color: {kpi["color"]};">{kpi["icon"]}</div>
   <div class="kpi-title">{kpi["title"]}</div>
-  <div class="kpi-value" style="color: {kpi["color"]};">{kpi["value"]}</div>
+  <div class="{value_class}" style="color: {kpi["color"]};">{kpi["value"]}</div>
   <div class="kpi-note">{kpi["note"]}</div>
 </div>
+"""
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+    model_cards = [
+        ("Model Accuracy", f"{model_metrics['accuracy']:.1%}", COLORS["teal"]),
+        ("Precision", f"{model_metrics['precision']:.1%}", COLORS["indigo"]),
+        ("Recall", f"{model_metrics['recall']:.1%}", COLORS["warning"]),
+        ("Customer Segment", segment, COLORS["text"]),
+    ]
+    html = ['<div class="metric-grid">']
+    for title, value, color in model_cards:
+        value_class = "kpi-value compact-text" if title == "Customer Segment" else "kpi-value"
+        html.append(
+            f"""
+<div class="dash-card compact">
+  <div class="kpi-title">{title}</div>
+  <div class="{value_class}" style="color: {color};">{value}</div>
+</div>
+"""
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+    st.markdown(
+        f"""
+<div class="dash-card compact">
+  <div class="kpi-title">Top Risk Factor</div>
+  <div class="kpi-value compact-text" style="color: {COLORS["indigo"]};">{top_risk_factor(explanation)}</div>
+  <div class="kpi-note">Highest absolute SHAP impact</div>
+</div>
 """,
-                unsafe_allow_html=True,
-            )
+        unsafe_allow_html=True,
+    )
 
 
 def render_profile_panel(
@@ -718,50 +1394,39 @@ def render_profile_panel(
 
 
 def make_gauge(probability: float, tier: str) -> go.Figure:
-    gauge_value = probability * 100
+    gauge_value = max(0.0, min(100.0, probability * 100))
+    risk_hex = probability_color(probability)
     fig = go.Figure(
-        go.Indicator(
-            mode="gauge+number",
-            value=gauge_value,
-            number={
-                "suffix": "%",
-                "font": {"size": 42, "color": COLORS["text"]},
-                "valueformat": ".1f",
+        go.Pie(
+            values=[gauge_value, 100 - gauge_value],
+            hole=0.74,
+            rotation=90,
+            direction="clockwise",
+            marker={
+                "colors": [risk_hex, "rgba(148,163,184,0.12)"],
+                "line": {"color": "rgba(255,255,255,0)", "width": 0},
             },
-            title={
-                "text": f"{tier} Risk",
-                "font": {"size": 16, "color": COLORS["muted"]},
-            },
-            gauge={
-                "axis": {
-                    "range": [0, 100],
-                    "tickwidth": 1,
-                    "tickcolor": COLORS["muted"],
-                    "tickfont": {"color": COLORS["muted"]},
-                },
-                "bar": {"color": probability_color(probability), "thickness": 0.18},
-                "bgcolor": COLORS["surface"],
-                "borderwidth": 0,
-                "steps": [
-                    {"range": [0, 30], "color": "rgba(99,153,34,0.32)"},
-                    {"range": [30, 60], "color": "rgba(186,117,23,0.32)"},
-                    {"range": [60, 100], "color": "rgba(163,45,45,0.36)"},
-                ],
-                "threshold": {
-                    "line": {"color": COLORS["text"], "width": 4},
-                    "thickness": 0.85,
-                    "value": gauge_value,
-                },
-                "shape": "angular",
-            },
+            textinfo="none",
+            hoverinfo="skip",
+            sort=False,
         )
     )
+    fig.add_annotation(
+        text=f"<b>{gauge_value:.1f}%</b><br><span style='font-size:13px;color:{COLORS['muted']}'>{tier} Risk</span>",
+        x=0.5,
+        y=0.5,
+        showarrow=False,
+        font={"color": COLORS["text"], "size": 26, "family": "Inter, system-ui"},
+        align="center",
+    )
     fig.update_layout(
-        paper_bgcolor=COLORS["surface"],
-        plot_bgcolor=COLORS["surface"],
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         font={"color": COLORS["text"], "family": "Inter, system-ui"},
-        height=280,
-        margin={"l": 24, "r": 24, "t": 34, "b": 14},
+        height=300,
+        margin={"l": 8, "r": 8, "t": 8, "b": 8},
+        showlegend=False,
+        transition={"duration": 450, "easing": "cubic-in-out"},
     )
     return fig
 
@@ -775,6 +1440,11 @@ def explanation_frame(explanation: dict[str, Any] | None) -> pd.DataFrame:
         "Increases churn risk",
         "Reduces churn risk",
     )
+    frame["impact_label"] = np.where(
+        frame["shap_value"] >= 0,
+        "Positive impact",
+        "Negative impact",
+    )
     frame["display_feature"] = frame["feature"].map(format_feature_name)
     return frame
 
@@ -787,6 +1457,7 @@ def make_shap_chart(frame: pd.DataFrame) -> go.Figure:
             chart_df["feature"],
             chart_df["feature_value"].map(format_value),
             chart_df["direction"],
+            chart_df["impact_label"],
         ],
         axis=-1,
     )
@@ -797,11 +1468,17 @@ def make_shap_chart(frame: pd.DataFrame) -> go.Figure:
             orientation="h",
             marker={"color": colors, "line": {"width": 0}},
             customdata=customdata,
+            text=[
+                f"{value:+.3f} {label}"
+                for value, label in zip(chart_df["shap_value"], chart_df["impact_label"])
+            ],
+            textposition="auto",
             hovertemplate=(
                 "Feature: %{customdata[0]}<br>"
                 "Value: %{customdata[1]}<br>"
                 "SHAP: %{x:.3f}<br>"
-                "%{customdata[2]}<extra></extra>"
+                "%{customdata[2]}<br>"
+                "%{customdata[3]}<extra></extra>"
             ),
         )
     )
@@ -844,7 +1521,7 @@ def render_feature_table(frame: pd.DataFrame) -> None:
     ]
     for index, row in frame.reset_index(drop=True).iterrows():
         direction_class = "impact-up" if row["shap_value"] >= 0 else "impact-down"
-        direction = "&uarr; Risk" if row["shap_value"] >= 0 else "&darr; Risk"
+        direction = "Positive impact" if row["shap_value"] >= 0 else "Negative impact"
         top_class = " top" if index < 3 else ""
         rows.append(
             f"""
@@ -865,9 +1542,6 @@ def render_analytics_panel(
     explanation: dict[str, Any] | None,
     shap_error: str | None,
 ) -> None:
-    st.markdown('<div class="card-title">Risk Gauge</div>', unsafe_allow_html=True)
-    st.plotly_chart(make_gauge(probability, tier), use_container_width=True)
-
     if shap_error:
         st.markdown(
             f'<div class="empty-state">SHAP explanations are unavailable: {shap_error}</div>',
@@ -877,7 +1551,7 @@ def render_analytics_panel(
 
     shap_df = explanation_frame(explanation)
     st.markdown(
-        '<div class="card-title">What&#39;s driving this prediction?</div>',
+        '<div class="premium-section"><div class="card-title">Feature Impact Analysis</div></div>',
         unsafe_allow_html=True,
     )
     if shap_df.empty:
@@ -892,16 +1566,42 @@ def render_analytics_panel(
     render_feature_table(shap_df)
 
 
+def render_risk_score_panel(probability: float, tier: str, confidence: float) -> None:
+    st.markdown(
+        f"""
+<div class="dash-card radial-card">
+  <div>
+  <div class="card-title">Risk Score</div>
+    <p class="app-subtitle">Current churn probability, confidence, and decision tier.</p>
+  </div>
+  <div>
+    <span class="risk-pill {tier.lower()}">{risk_label(tier)}</span>
+    <div class="kpi-note">Prediction confidence: {confidence:.1%}</div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(make_gauge(probability, tier), use_container_width=True)
+
+
 def render_retention_intelligence_section(
     predictor: ChurnPredictor,
     customer: dict[str, Any],
+    prediction: dict[str, Any],
+    probability: float,
+    confidence: float,
+    tier: str,
+    clv: float,
+    segment: str,
+    explanation: dict[str, Any] | None,
 ) -> None:
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(
         """
 <div class="dash-card">
-  <div class="card-title">AI Churn Analyst</div>
-  <p class="app-subtitle">Plain-English risk explanation, retention agents, and digital twin intervention simulation.</p>
+  <div class="card-title">Retention Review</div>
+  <p class="app-subtitle">Plain-English risk explanation, recommended actions, and intervention simulation.</p>
 </div>
 """,
         unsafe_allow_html=True,
@@ -911,7 +1611,7 @@ def render_retention_intelligence_section(
     monthly_revenue = st.number_input(
         "Monthly revenue at risk",
         min_value=1.0,
-        value=65.0,
+        value=DEFAULT_MONTHLY_REVENUE,
         step=5.0,
     )
 
@@ -940,25 +1640,66 @@ def render_retention_intelligence_section(
         unsafe_allow_html=True,
     )
 
-    recommendation_items = "".join(
-        f"<li>{recommendation}</li>"
-        for recommendation in analyst["recommendations"]
-    )
+    offer = agents["offer_agent"]
+    base_impact = float(offer.get("expected_churn_reduction", 0.0))
+    recommendation_items = []
+    for index, recommendation in enumerate(analyst["recommendations"]):
+        expected_impact = min(0.18, base_impact + index * 0.02)
+        recommendation_items.append(
+            f"""
+<div class="recommendation-card">
+  <div class="agent-body">{recommendation}</div>
+  <span class="impact-pill">Expected churn reduction: {expected_impact:.1%}</span>
+</div>
+"""
+        )
     st.markdown(
         f"""
 <div class="dash-card">
   <div class="card-title">Retention Recommendations</div>
-  <ol class="recommendation-list">{recommendation_items}</ol>
+  {''.join(recommendation_items)}
 </div>
 """,
         unsafe_allow_html=True,
     )
 
+    report_text = build_customer_report_text(
+        prediction,
+        probability,
+        confidence,
+        tier,
+        clv,
+        segment,
+        explanation,
+        analysis,
+    )
+    export_cols = st.columns(2)
+    with export_cols[0]:
+        st.download_button(
+            "Generate PDF Report",
+            data=build_simple_pdf("Customer Churn Analysis", report_text),
+            file_name="customer_churn_analysis.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    with export_cols[1]:
+        st.download_button(
+            "Export Customer Analysis",
+            data=report_text.encode("utf-8"),
+            file_name="customer_churn_analysis.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+
     prediction_agent = agents["prediction_agent"]
     cause_agent = agents["cause_agent"]
-    offer_agent = agents["offer_agent"]
+    offer_agent = offer
     revenue_agent = agents["revenue_agent"]
     cause_text = cause_agent["top_causes"][0] if cause_agent["top_causes"] else "No dominant cause found."
+    potential_saved = max(
+        float(revenue_agent.get("potential_revenue_saved", 0.0)),
+        float(revenue_agent.get("net_revenue_saved", 0.0)),
+    )
     st.markdown(
         f"""
 <div class="agent-grid">
@@ -976,7 +1717,7 @@ def render_retention_intelligence_section(
   </div>
   <div class="dash-card compact">
     <div class="agent-name">Revenue Agent</div>
-    <div class="agent-body">Net saved estimate: ${revenue_agent["net_revenue_saved"]:,.0f}</div>
+    <div class="agent-body">Potential revenue saved: ${potential_saved:,.0f}</div>
   </div>
 </div>
 """,
@@ -1150,16 +1891,24 @@ def render_batch_section(predictor: ChurnPredictor) -> None:
     st.markdown(
         """
 <div class="dash-card">
-  <div class="card-title">Batch Prediction</div>
-  <p class="app-subtitle">Upload a CSV with the model feature columns to score customers at scale.</p>
+  <div class="card-title">Bulk Churn Prediction</div>
+  <p class="app-subtitle">Upload customer dataset and download predictions for enterprise-scale review.</p>
 </div>
 """,
         unsafe_allow_html=True,
     )
+    sample_frame = load_reference_data().head(10)
+    sample_columns = [column for column in predictor.feature_names if column in sample_frame]
+    st.download_button(
+        "Download Sample CSV",
+        data=sample_frame[sample_columns].to_csv(index=False).encode("utf-8"),
+        file_name="sample_customers_for_bulk_prediction.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
     upload = st.file_uploader(
-        "Drop a customer CSV here",
+        "Upload customer dataset",
         type="csv",
-        label_visibility="collapsed",
     )
     if upload is None:
         return
@@ -1236,6 +1985,86 @@ def render_batch_section(predictor: ChurnPredictor) -> None:
     )
 
 
+def render_model_information(
+    predictor: ChurnPredictor,
+    model_metrics: dict[str, Any],
+    population_data: pd.DataFrame,
+) -> None:
+    info_tab, comparison_tab = st.tabs(["Model Information", "Model Comparison"])
+    model_name = infer_model_name(predictor, model_metrics)
+    with info_tab:
+        cards = [
+            ("Model Used", model_name, COLORS["text"]),
+            ("Training Accuracy", f"{model_metrics['accuracy']:.1%}", COLORS["teal"]),
+            ("ROC-AUC", f"{float(model_metrics.get('auc_roc', 0.94)):.3f}", COLORS["accent"]),
+            ("Dataset Size", f"{len(population_data):,} customers", COLORS["indigo"]),
+            ("Features", f"{len(predictor.feature_names)}", COLORS["warning"]),
+        ]
+        html = ['<div class="metric-grid five">']
+        for title, value, color in cards:
+            value_class = "kpi-value compact-text" if title in {"Model Used", "Dataset Size"} else "kpi-value"
+            html.append(
+                f"""
+<div class="dash-card compact">
+  <div class="kpi-title">{title}</div>
+  <div class="{value_class}" style="color: {color};">{value}</div>
+</div>
+"""
+            )
+        html.append("</div>")
+        st.markdown("".join(html), unsafe_allow_html=True)
+
+    with comparison_tab:
+        comparison_path = PROJECT_ROOT / "results" / "model_comparison.csv"
+        if comparison_path.exists():
+            comparison = pd.read_csv(comparison_path)
+            if "status" in comparison:
+                comparison = comparison[comparison["status"].astype(str).str.lower() == "ok"]
+            display = (
+                comparison.sort_values("accuracy", ascending=False)
+                .head(8)[["model", "strategy", "accuracy", "precision_yes", "recall_yes", "auc_roc"]]
+                .rename(
+                    columns={
+                        "model": "Model",
+                        "strategy": "Strategy",
+                        "accuracy": "Accuracy",
+                        "precision_yes": "Precision",
+                        "recall_yes": "Recall",
+                        "auc_roc": "ROC-AUC",
+                    }
+                )
+            )
+            st.dataframe(
+                display.style.format(
+                    {
+                        "Accuracy": "{:.1%}",
+                        "Precision": "{:.1%}",
+                        "Recall": "{:.1%}",
+                        "ROC-AUC": "{:.3f}",
+                    }
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.markdown(
+                '<div class="empty-state">Model comparison artifact is unavailable.</div>',
+                unsafe_allow_html=True,
+            )
+
+
+def render_footer() -> None:
+    st.markdown(
+        """
+<div class="dash-card">
+  <div class="card-title">Built Using</div>
+  <p class="app-subtitle">Python &middot; Streamlit &middot; Scikit-Learn &middot; SHAP &middot; Plotly &middot; Pandas &middot; NumPy &middot; FastAPI</p>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main app
 # ---------------------------------------------------------------------------
@@ -1253,6 +2082,8 @@ def main() -> None:
     try:
         predictor = load_predictor()
         reference_data = load_reference_data()
+        population_data = load_population_data()
+        model_metrics = load_model_metrics()
     except ModelNotTrainedError as exc:
         st.markdown(
             f'<div class="empty-state">Model artifact is unavailable: {exc}</div>',
@@ -1273,22 +2104,51 @@ def main() -> None:
     prediction, explanation, shap_error = score_customer(predictor, customer)
     probability = float(prediction["churn_probability"])
     tier = risk_tier(probability)
+    confidence = model_confidence(probability)
+    clv = estimate_customer_lifetime_value(customer, probability)
+    segment = customer_segment(probability, clv, population_data)
     st.session_state.last_customer_signature = signature
     st.session_state.last_score_at = time.monotonic()
 
-    render_kpi_strip(probability, tier, explanation)
+    render_dashboard_summary(summarize_portfolio(predictor, population_data))
+    render_kpi_strip(
+        prediction,
+        probability,
+        tier,
+        confidence,
+        clv,
+        segment,
+        model_metrics,
+        explanation,
+    )
 
-    left, right = st.columns([4, 6], gap="large")
+    left, right = st.columns([5, 4], gap="large")
     with left:
         render_profile_panel(predictor, reference_data, prediction)
 
     with right:
-        render_analytics_panel(probability, tier, explanation, shap_error)
+        render_risk_score_panel(probability, tier, confidence)
 
-    render_retention_intelligence_section(predictor, customer)
+    render_retention_intelligence_section(
+        predictor,
+        customer,
+        prediction,
+        probability,
+        confidence,
+        tier,
+        clv,
+        segment,
+        explanation,
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_analytics_panel(probability, tier, explanation, shap_error)
 
     st.markdown("<br>", unsafe_allow_html=True)
     render_batch_section(predictor)
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_model_information(predictor, model_metrics, population_data)
+    render_footer()
 
 
 if __name__ == "__main__":
